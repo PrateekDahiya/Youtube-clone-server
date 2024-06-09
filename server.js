@@ -10,7 +10,7 @@ app.use(express.json());
 var config = {
     user: "root", // Database username
     password: "12345", // Database password
-    server: "localhost", // Server IP address
+    server: "127.0.0.1", // Server IP address
     database: "youtube", // Database name
     port: 3306, // Server port
     options: {
