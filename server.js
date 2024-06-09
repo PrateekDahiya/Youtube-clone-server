@@ -8,11 +8,11 @@ const port = 5000;
 app.use(express.json());
 
 var config = {
-    user: "root", // Database username
-    password: "12345", // Database password
-    server: "127.0.0.1", // Server IP address
-    database: "youtube", // Database name
-    port: 3306, // Server port
+     user: process.env.DB_USER || "root", // Database username
+    password: process.env.DB_PASSWORD || "12345", // Database password
+    server: process.env.DB_HOST || "127.0.0.1", // Server IP address
+    database: process.env.DB_NAME || "youtube", // Database name
+    port: process.env.DB_PORT || 3306, // Server port
     options: {
         encrypt: false, // Disable encryption
     },
