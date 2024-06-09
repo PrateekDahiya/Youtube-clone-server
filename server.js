@@ -281,7 +281,7 @@ app.get("/get-subs/:user_id", (req, res) => {
     });
 });
 
-const ytdlpPath = "yt-dlp";
+const ytdlpPath = "./yt-dlp";
 
 app.get("/get-stream-url", (req, res) => {
     const videoUrl = "https://www.youtube.com/watch?v=" + req.query.video_id;
