@@ -8,6 +8,7 @@ const port = process.env.PORT;
 app.use(express.json());
 
 var config = {
+     connectionLimit: 10,
      user: process.env.DB_USER, // Database username
     password: process.env.DB_PASSWORD, // Database password
     server: process.env.DB_HOST, // Server IP address
