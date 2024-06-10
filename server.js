@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require("path");
 const app = express();
 const mysql = require("mysql2");
 const axios = require("axios");
@@ -18,7 +19,6 @@ var config = {
         encrypt: false,
     },
 };
-
 
 const connection = mysql.createConnection(config);
 
@@ -241,7 +241,7 @@ app.get("/getvideobyid", (req, res) => {
     const query = `select * from videos v join channels c on v.channel_id=c.channel_id where v.video_id= ?`;
     connection.query(query, [video_id], (error, results) => {
         if (error) {
-            console.log(error);
+            console.log("Getvideobyid: " + error);
         }
         res.status(200).json({ video: results });
     });
@@ -283,7 +283,7 @@ app.get("/get-subs/:user_id", (req, res) => {
     });
 });
 
-const ytdlpPath = "./yt-dlp";
+const ytdlpPath = path.resolve(__dirname, "yt-dlp");
 
 app.get("/get-stream-url", (req, res) => {
     const videoUrl = "https://www.youtube.com/watch?v=" + req.query.video_id;
