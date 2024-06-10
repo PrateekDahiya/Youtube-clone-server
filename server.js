@@ -3,7 +3,7 @@ const app = express();
 const mysql = require("mysql");
 const axios = require("axios");
 const { exec } = require("child_process");
-const port = 5000;
+const port = process.env.PORT;
 
 app.use(express.json());
 
