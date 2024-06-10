@@ -2,22 +2,23 @@ const express = require("express");
 const app = express();
 const mysql = require("mysql");
 const axios = require("axios");
+require("dotenv").config();
 const { exec } = require("child_process");
 const port = process.env.PORT;
 
 app.use(express.json());
 
 var config = {
-     connectionLimit: 10,
-     user: process.env.DB_USER, // Database username
-    password: process.env.DB_PASSWORD, // Database password
-    server: process.env.DB_HOST, // Server IP address
+    user: process.env.DB_USER, // Database username
+    password: process.env.DB_PASS, // Database password
+    host: process.env.DB_HOST, // Server IP address
     database: process.env.DB_NAME, // Database name
-    port: process.env.DB_PORT, // Server port
+    port: process.env.DB_PORT, // Server port,
     options: {
-        encrypt: false, // Disable encryption
+        encrypt: false,
     },
 };
+
 
 const connection = mysql.createConnection(config);
 
