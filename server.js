@@ -296,8 +296,9 @@ app.get("/get-stream-url", (req, res) => {
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
-            console.error(`exec error: ${error}`);
-            return res.status(500).send("An error occurred");
+            console.error(`exec error: ${error.message}`);
+            console.error(`exec stderr: ${stderr}`);
+            return res.status(500).send(`An error occurred: ${error.message}\nStderr: ${stderr}`);
         }
 
         if (stderr) {
