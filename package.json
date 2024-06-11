@@ -6,8 +6,6 @@
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
         "start": "nodemon server.js",
-        "postinstall": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp && chmod +x /app/yt-dlp"
-
     },
     "author": "",
     "license": "ISC",
