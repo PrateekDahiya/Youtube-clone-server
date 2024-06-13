@@ -10,10 +10,11 @@ const API_KEYS = [
 let currentApiKeyIndex = 0;
 
 const dbConfig = {
-    host: "localhost",
+    host: "roundhouse.proxy.rlwy.net",
     user: "root",
-    password: "12345",
+    password: "WSctbyTrTVbTOwfSdDWKByZGOGsXHMFC",
     database: "youtube",
+    port: 59156,
 };
 
 const categoryMapping = {
@@ -321,9 +322,60 @@ const fetchAndStoreVideos = async (
     }
 };
 
-const channelId = "UCrWdPsIgE4GIWGiFUMHL4bQ";
+const channelId = "UCRXiA3h1no_PFkb1JCP0yMA";
 const totalResults = 100;
 const startingPageToken = null;
 fetchAndStoreVideos(channelId, totalResults, startingPageToken)
     .then(() => console.log("Videos stored successfully."))
     .catch((error) => console.error("Error:", error.message));
+
+// npm install uuid
+// const { v4: uuidv4 } = require("uuid");
+
+// // Function to generate a base64 encoded UUID
+// function generateBase64Uuid() {
+//     // Generate a UUID
+//     const uuid = uuidv4();
+//     // Remove hyphens from the UUID
+//     const uuidWithoutHyphens = uuid.replace(/-/g, "");
+//     // Convert the UUID to a Buffer
+//     const buffer = Buffer.from(uuidWithoutHyphens, "hex");
+//     // Encode the Buffer to base64
+//     const base64Id = buffer.toString("base64");
+//     // Replace '+' with '-' and '/' with '_', and remove '==' padding
+//     const urlSafeBase64Id = base64Id
+//         .replace(/\+/g, "-")
+//         .replace(/\//g, "_")
+//         .replace(/=+$/, "");
+//     return urlSafeBase64Id;
+// }
+
+// // Function to generate a channel ID
+// function generateChannelId() {
+//     const base64Id = generateBase64Uuid();
+//     return `UC${base64Id}`;
+// }
+
+// // Function to generate a video ID
+// function generateVideoId() {
+//     // Generate a shorter UUID (using only the first 6 bytes)
+//     const uuid = uuidv4().replace(/-/g, "").substring(0, 12);
+//     // Convert the short UUID to a Buffer
+//     const buffer = Buffer.from(uuid, "hex");
+//     // Encode the Buffer to base64
+//     const base64Id = buffer.toString("base64");
+//     // Replace '+' with '-' and '/' with '_', and remove '==' padding
+//     const urlSafeBase64Id = base64Id
+//         .replace(/\+/g, "-")
+//         .replace(/\//g, "_")
+//         .replace(/=+$/, "");
+//     return urlSafeBase64Id;
+// }
+
+// // Generate a channel ID
+// const channelId = generateChannelId();
+// console.log("Channel ID:", channelId);
+
+// // Generate a video ID
+// const videoId = generateVideoId();
+// console.log("Video ID:", videoId);

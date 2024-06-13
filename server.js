@@ -10,14 +10,11 @@ const port = process.env.PORT;
 app.use(express.json());
 
 var config = {
-    user: process.env.DB_USER, // Database username
-    password: process.env.DB_PASS, // Database password
-    host: process.env.DB_HOST, // Server IP address
-    database: process.env.DB_NAME, // Database name
-    port: process.env.DB_PORT, // Server port,
-    options: {
-        encrypt: false,
-    },
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT,
 };
 
 const connection = mysql.createConnection(config);
@@ -27,52 +24,8 @@ connection.connect((err) => {
         console.error("Database Connection Failed! Error: ", err);
         return;
     }
-    console.log("Connection Successful!");
+    console.log("Database Connection Successful!");
 });
-// Declare variables to store fetched data
-let allVideos = [];
-let allChannels = [];
-
-// Function to fetch all channels
-const fetchwholedatabase = () => {
-    return new Promise((resolve, reject) => {
-        const query =
-            "SELECT * FROM channels c join videos v on c.channel_id=v.channel_id where isShort = 0 order by upload_time desc limit 100";
-        connection.query(query, (err, results) => {
-            if (err) {
-                reject(err);
-            } else {
-                allVideos = results;
-                resolve();
-            }
-        });
-    });
-};
-
-const fetchAllChannels = () => {
-    return new Promise((resolve, reject) => {
-        const query = "SELECT * FROM channels";
-        connection.query(query, (err, results) => {
-            if (err) {
-                reject(err);
-            } else {
-                allChannels = results;
-                resolve();
-            }
-        });
-    });
-};
-// Fetch all data
-const fetchAllData = async () => {
-    try {
-        await fetchAllChannels();
-        await fetchwholedatabase();
-    } catch (error) {
-        console.error("Error fetching data:", error);
-    }
-};
-
-fetchAllData();
 
 app.get("/home", (req, res) => {
     const channel_id = req.query.channel_id;
@@ -81,6 +34,7 @@ app.get("/home", (req, res) => {
         if (error) {
             console.log(error);
         }
+        console.log("Fetched home data!");
         res.status(200).json({ page: "home", videos: results });
     });
 });
@@ -96,6 +50,7 @@ app.get("/shorts", (req, res) => {
                 if (error) {
                     console.log(error);
                 }
+                console.log("Fetched shorts data! video_id: ", video_id);
                 res.status(200).json({ page: "shorts", shorts_vIds: results });
             }
         );
@@ -105,6 +60,7 @@ app.get("/shorts", (req, res) => {
             if (error) {
                 console.log(error);
             }
+            console.log("Fetched shorts data! No video_id provided.");
             res.status(200).json({ page: "shorts", shorts_vIds: results });
         });
     }
@@ -117,6 +73,7 @@ app.get("/yourchannel", (req, res) => {
         if (error) {
             console.log(error);
         }
+        console.log("Fetched yourchannel data! channel_id: ", channel_id);
         res.status(200).json({ page: "yourchannel", channel: results });
     });
 });
@@ -129,6 +86,7 @@ app.get("/subscriptions", (req, res) => {
         if (error) {
             console.log(error);
         }
+        console.log("Fetched subscriptions data! user_id: ", user_id);
         res.status(200).json({ page: "subscription", data: results });
     });
 });
@@ -141,6 +99,7 @@ app.get("/watch", (req, res) => {
         if (error) {
             return res.status(500).json({ error: error.message });
         }
+        console.log("Fetched watch data! video_id: ", videoId);
         res.status(200).json({ page: "watch", data: results });
     });
 });
@@ -148,10 +107,12 @@ app.get("/watch", (req, res) => {
 app.get("/channel", (req, res) => {
     const channel_id = req.query.channel_id;
     const query = `select * from channels where channel_id=?`;
+
     connection.query(query, [channel_id], (error, results) => {
         if (error) {
             console.log(error);
         }
+        console.log("Fetched channel data! channel_id: ", channel_id);
         res.status(200).json({ page: "channel", channel: results });
     });
 });
@@ -206,6 +167,7 @@ app.get("/category", (req, res) => {
             if (error) {
                 console.log(error);
             }
+            console.log("Fetched category data! category: ", category);
             res.status(200).json({
                 page: "category",
                 caticon: caticon[category],
@@ -227,6 +189,7 @@ app.get("/search", (req, res) => {
             if (error) {
                 console.log(error);
             }
+            console.log("Fetched search data! query: ", query);
             res.status(200).json({
                 page: "search",
                 videos: results,
@@ -243,20 +206,59 @@ app.get("/getvideobyid", (req, res) => {
         if (error) {
             console.log("Getvideobyid: " + error);
         }
+        console.log("Fetched video by id! video_id: ", video_id);
         res.status(200).json({ video: results });
     });
 });
 
 app.get("/getvideosofchannel", (req, res) => {
     const channel_id = req.query.channel_id;
+    const searchTerm = req.query.query || ""; // default to empty string if query is not provided
     const type = req.query.type;
-    const query = `select * from videos v join channels c on v.channel_id=c.channel_id where v.channel_id= ? and isShort= ? order by upload_time desc limit 100`;
-    connection.query(query, [channel_id, type], (error, results) => {
-        if (error) {
-            console.log(error);
-        }
-        res.status(200).json({ videos: results });
-    });
+    const formattedSearchTerm = `%${searchTerm}%`; // Add wildcards
+
+    let query;
+    if (searchTerm === "") {
+        query = `SELECT * FROM videos v 
+                 JOIN channels c ON v.channel_id = c.channel_id 
+                 WHERE v.channel_id = ? AND v.isShort = ? 
+                 ORDER BY upload_time DESC 
+                 LIMIT 100`;
+
+        connection.query(query, [channel_id, type], (error, results) => {
+            if (error) {
+                console.error(error);
+                return res.status(500).json({ error: "Database query failed" });
+            }
+            console.log("Fetched videos of channel! channel_id: ", channel_id);
+            res.status(200).json({ videos: results });
+        });
+    } else {
+        query = `SELECT * FROM videos v 
+                 JOIN channels c ON v.channel_id = c.channel_id 
+                 WHERE v.channel_id = ? AND v.isShort = ? 
+                 AND (v.title LIKE ?) 
+                 ORDER BY upload_time DESC 
+                 LIMIT 100`;
+
+        connection.query(
+            query,
+            [channel_id, type, formattedSearchTerm],
+            (error, results) => {
+                if (error) {
+                    console.error(error);
+                    return res
+                        .status(500)
+                        .json({ error: "Database query failed" });
+                }
+                console.log(
+                    "Fetched videos of channel! channel_id: ",
+                    channel_id
+                );
+                res.status(200).json({ videos: results });
+            }
+        );
+    }
 });
 
 app.get("/getallchannels", (req, res) => {
@@ -266,19 +268,20 @@ app.get("/getallchannels", (req, res) => {
         if (error) {
             return res.status(500).json({ error: error.message });
         }
+        console.log("Fetched all channels!");
         res.status(200).json({ data: results });
     });
 });
 
 app.get("/get-subs/:user_id", (req, res) => {
     const user_id = req.params.user_id;
-    let subs = [];
     const query = `SELECT * FROM subscriptions s join channels c where s.channel_id=c.channel_id and s.user_id= ?`;
 
     connection.query(query, [user_id], (error, results) => {
         if (error) {
             return res.status(500).json({ error: error.message });
         }
+        console.log("Fetched user subscriptions! user_id: ", user_id);
         res.json({ subscription: results });
     });
 });
@@ -296,9 +299,8 @@ app.get("/get-stream-url", (req, res) => {
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
-            console.error(`exec error: ${error.message}`);
-            console.error(`exec stderr: ${stderr}`);
-            return res.status(500).send(`An error occurred: ${error.message}\nStderr: ${stderr}`);
+            console.error(`exec error: ${error}`);
+            return res.status(500).send("An error occurred");
         }
 
         if (stderr) {
@@ -306,8 +308,9 @@ app.get("/get-stream-url", (req, res) => {
         }
 
         const streamUrl = stdout.trim();
+        console.log("Fetched stream URL! video_id: ", req.query.video_id);
         res.json({ streamUrl });
     });
 });
 
-app.listen(port, () => console.log(`listening on port ${port}!`));
+app.listen(port, () => console.log(`Server on port: ${port}`));
