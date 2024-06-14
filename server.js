@@ -6,9 +6,10 @@ const axios = require("axios");
 require("dotenv").config();
 const { exec } = require("child_process");
 const port = process.env.PORT;
+const cors = require("cors");
 
 app.use(express.json());
-
+app.use(cors());
 var config = {
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
@@ -300,7 +301,7 @@ app.get("/get-stream-url", (req, res) => {
     exec(command, (error, stdout, stderr) => {
         if (error) {
             console.error(`exec error: ${error}`);
-            return res.status(500).send(`An error occurred: ${error}`);
+            return res.status(500).send("An error occurred");
         }
 
         if (stderr) {
