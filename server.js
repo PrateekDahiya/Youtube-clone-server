@@ -309,7 +309,7 @@ function executeCommand(command) {
     });
 }
 
-const ytdlpPath = "ytdlp.exe";
+const ytdlpPath = "yt-dlp";
 
 app.get("/get-stream-url", async (req, res) => {
     const videoId = req.query.video_id;
@@ -319,7 +319,7 @@ app.get("/get-stream-url", async (req, res) => {
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const command = `${ytdlpPath} -f best --get-url ${videoUrl}`;
+    const command = `${ytdlpPath} --get-url ${videoUrl}`;
 
     console.log(`Fetching stream URL for video ID: ${videoId}`);
     const startTime = Date.now();
