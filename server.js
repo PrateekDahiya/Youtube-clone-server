@@ -289,7 +289,12 @@ app.get("/get-subs/:user_id", (req, res) => {
 
 function executeCommand(command) {
     return new Promise((resolve, reject) => {
+        console.log(`Executing command: ${command}`);
+        const execStartTime = Date.now();
         exec(command, (error, stdout, stderr) => {
+            const execEndTime = Date.now();
+            console.log(`Command executed in ${execEndTime - execStartTime}ms`);
+
             if (error) {
                 reject(new Error(`exec error: ${error.message}`));
                 return;
@@ -304,7 +309,7 @@ function executeCommand(command) {
     });
 }
 
-const ytdlpPath = "yt-dlp";
+const ytdlpPath = "ytdlp.exe";
 
 app.get("/get-stream-url", async (req, res) => {
     const videoId = req.query.video_id;
@@ -316,12 +321,22 @@ app.get("/get-stream-url", async (req, res) => {
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     const command = `${ytdlpPath} -f best --get-url ${videoUrl}`;
 
+    console.log(`Fetching stream URL for video ID: ${videoId}`);
+    const startTime = Date.now();
+
     try {
         const streamUrl = await executeCommand(command);
+        const endTime = Date.now();
+        console.log(
+            `Fetched stream URL in ${
+                endTime - startTime
+            }ms! video_id: ${videoId}`
+        );
+
         if (!streamUrl) {
             return res.status(500).send("Failed to fetch stream URL");
         }
-        console.log("Fetched stream URL! video_id: ", videoId);
+
         res.json({ streamUrl: streamUrl.trim() });
     } catch (error) {
         console.error(`Error fetching stream URL: ${error.message}`);
