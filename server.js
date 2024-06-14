@@ -287,31 +287,46 @@ app.get("/get-subs/:user_id", (req, res) => {
     });
 });
 
+function executeCommand(command) {
+    return new Promise((resolve, reject) => {
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(new Error(`exec error: ${error.message}`));
+                return;
+            }
+
+            if (stderr) {
+                console.error(`stderr: ${stderr}`);
+            }
+
+            resolve(stdout);
+        });
+    });
+}
+
 const ytdlpPath = "yt-dlp";
 
-app.get("/get-stream-url", (req, res) => {
-    const videoUrl = "https://www.youtube.com/watch?v=" + req.query.video_id;
+app.get("/get-stream-url", async (req, res) => {
+    const videoId = req.query.video_id;
 
-    if (!videoUrl) {
-        return res.status(400).send("Video URL is required");
+    if (!videoId) {
+        return res.status(400).send("Video ID is required");
     }
 
-    const command = `${ytdlpPath} -f b --get-url ${videoUrl}`;
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const command = `${ytdlpPath} -f best --get-url ${videoUrl}`;
 
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`exec error: ${error}`);
-            return res.status(500).send("An error occurred");
+    try {
+        const streamUrl = await executeCommand(command);
+        if (!streamUrl) {
+            return res.status(500).send("Failed to fetch stream URL");
         }
-
-        if (stderr) {
-            console.error(`stderr: ${stderr}`);
-        }
-
-        const streamUrl = stdout.trim();
-        console.log("Fetched stream URL! video_id: ", req.query.video_id);
-        res.json({ streamUrl });
-    });
+        console.log("Fetched stream URL! video_id: ", videoId);
+        res.json({ streamUrl: streamUrl.trim() });
+    } catch (error) {
+        console.error(`Error fetching stream URL: ${error.message}`);
+        res.status(500).send("An error occurred while fetching the stream URL");
+    }
 });
 
 app.listen(port, () => console.log(`Server on port: ${port}`));
