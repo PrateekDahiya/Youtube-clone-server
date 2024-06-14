@@ -319,19 +319,12 @@ app.get("/get-stream-url", async (req, res) => {
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const command = `${ytdlpPath} --get-url ${videoUrl}`;
+    const command = `${ytdlpPath} -f best --get-url ${videoUrl}`;
 
     console.log(`Fetching stream URL for video ID: ${videoId}`);
-    const startTime = Date.now();
 
     try {
         const streamUrl = await executeCommand(command);
-        const endTime = Date.now();
-        console.log(
-            `Fetched stream URL in ${
-                endTime - startTime
-            }ms! video_id: ${videoId}`
-        );
 
         if (!streamUrl) {
             return res.status(500).send("Failed to fetch stream URL");
