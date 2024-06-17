@@ -319,7 +319,7 @@ app.get("/get-stream-url", async (req, res) => {
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const command = `${ytdlpPath} -f best --get-url ${videoUrl}`;
+    const command = `${ytdlpPath} -f b --get-url ${videoUrl}`;
 
     console.log(`Fetching stream URL for video ID: ${videoId}`);
 
