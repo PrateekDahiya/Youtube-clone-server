@@ -35,7 +35,6 @@ app.get("/home", (req, res) => {
         if (error) {
             console.log(error);
         }
-        console.log("Fetched home data!");
         res.status(200).json({ page: "home", videos: results });
     });
 });
@@ -51,7 +50,6 @@ app.get("/shorts", (req, res) => {
                 if (error) {
                     console.log(error);
                 }
-                console.log("Fetched shorts data! video_id: ", video_id);
                 res.status(200).json({ page: "shorts", shorts_vIds: results });
             }
         );
@@ -61,7 +59,6 @@ app.get("/shorts", (req, res) => {
             if (error) {
                 console.log(error);
             }
-            console.log("Fetched shorts data! No video_id provided.");
             res.status(200).json({ page: "shorts", shorts_vIds: results });
         });
     }
@@ -74,7 +71,6 @@ app.get("/yourchannel", (req, res) => {
         if (error) {
             console.log(error);
         }
-        console.log("Fetched yourchannel data! channel_id: ", channel_id);
         res.status(200).json({ page: "yourchannel", channel: results });
     });
 });
@@ -87,7 +83,6 @@ app.get("/subscriptions", (req, res) => {
         if (error) {
             console.log(error);
         }
-        console.log("Fetched subscriptions data! user_id: ", user_id);
         res.status(200).json({ page: "subscription", data: results });
     });
 });
@@ -100,7 +95,6 @@ app.get("/watch", (req, res) => {
         if (error) {
             return res.status(500).json({ error: error.message });
         }
-        console.log("Fetched watch data! video_id: ", videoId);
         res.status(200).json({ page: "watch", data: results });
     });
 });
@@ -113,7 +107,6 @@ app.get("/channel", (req, res) => {
         if (error) {
             console.log(error);
         }
-        console.log("Fetched channel data! channel_id: ", channel_id);
         res.status(200).json({ page: "channel", channel: results });
     });
 });
@@ -168,7 +161,6 @@ app.get("/category", (req, res) => {
             if (error) {
                 console.log(error);
             }
-            console.log("Fetched category data! category: ", category);
             res.status(200).json({
                 page: "category",
                 caticon: caticon[category],
@@ -190,7 +182,6 @@ app.get("/search", (req, res) => {
             if (error) {
                 console.log(error);
             }
-            console.log("Fetched search data! query: ", query);
             res.status(200).json({
                 page: "search",
                 videos: results,
@@ -207,7 +198,6 @@ app.get("/getvideobyid", (req, res) => {
         if (error) {
             console.log("Getvideobyid: " + error);
         }
-        console.log("Fetched video by id! video_id: ", video_id);
         res.status(200).json({ video: results });
     });
 });
@@ -231,7 +221,6 @@ app.get("/getvideosofchannel", (req, res) => {
                 console.error(error);
                 return res.status(500).json({ error: "Database query failed" });
             }
-            console.log("Fetched videos of channel! channel_id: ", channel_id);
             res.status(200).json({ videos: results });
         });
     } else {
@@ -252,10 +241,7 @@ app.get("/getvideosofchannel", (req, res) => {
                         .status(500)
                         .json({ error: "Database query failed" });
                 }
-                console.log(
-                    "Fetched videos of channel! channel_id: ",
-                    channel_id
-                );
+
                 res.status(200).json({ videos: results });
             }
         );
@@ -269,7 +255,6 @@ app.get("/getallchannels", (req, res) => {
         if (error) {
             return res.status(500).json({ error: error.message });
         }
-        console.log("Fetched all channels!");
         res.status(200).json({ data: results });
     });
 });
@@ -282,7 +267,6 @@ app.get("/get-subs/:user_id", (req, res) => {
         if (error) {
             return res.status(500).json({ error: error.message });
         }
-        console.log("Fetched user subscriptions! user_id: ", user_id);
         res.json({ subscription: results });
     });
 });
@@ -314,9 +298,6 @@ app.get("/get-stream-url", async (req, res) => {
 
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     const command = `${ytdlpPath} -f b --get-url ${videoUrl}`;
-
-    console.log(`Fetching stream URL for video ID: ${videoId}`);
-
     try {
         const streamUrl = await executeCommand(command);
 
