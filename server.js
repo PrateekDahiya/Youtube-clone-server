@@ -289,17 +289,11 @@ app.get("/get-subs/:user_id", (req, res) => {
 
 function executeCommand(command) {
     return new Promise((resolve, reject) => {
-        console.log(`Executing command: ${command}`);
-        const execStartTime = Date.now();
         exec(command, (error, stdout, stderr) => {
-            const execEndTime = Date.now();
-            console.log(`Command executed in ${execEndTime - execStartTime}ms`);
-
             if (error) {
                 reject(new Error(`exec error: ${error.message}`));
                 return;
             }
-
             if (stderr) {
                 console.error(`stderr: ${stderr}`);
             }
@@ -332,7 +326,7 @@ app.get("/get-stream-url", async (req, res) => {
 
         res.json({ streamUrl: streamUrl.trim() });
     } catch (error) {
-        console.error(`Error fetching stream URL: ${error.message}`);
+        console.error(`Error fetching stream URL.`);
         res.status(500).send("An error occurred while fetching the stream URL");
     }
 });
