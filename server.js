@@ -77,9 +77,10 @@ app.get("/yourchannel", (req, res) => {
 
 app.get("/subscriptions", (req, res) => {
     const user_id = "UC0fcwXT_xgCBUuuczF-imLQ";
-    const query = `select * from videos v inner join channels c on v.channel_id=c.channel_id where v.channel_id in (select s.channel_id from subscriptions s where s.user_id=?)  order by upload_time desc limit 100`;
+    const isShort = req.query.isShort;
+    const query = `select * from videos v inner join channels c on v.channel_id=c.channel_id where v.channel_id in (select s.channel_id from subscriptions s where s.user_id=?) and v.isShort=? order by upload_time desc limit 100`;
 
-    connection.query(query, [user_id], (error, results) => {
+    connection.query(query, [user_id, isShort], (error, results) => {
         if (error) {
             console.log(error);
         }
