@@ -272,6 +272,19 @@ app.get("/getfeed", (req, res) => {
     });
 });
 
+app.post("/updatefeed", (req, res) => {
+    const user_id = req.body.user_id;
+    const feed = req.body.feed;
+    const query = `UPDATE user SET feed = ? WHERE user_id = ?`;
+
+    connection.query(query, [feed, user_id], (error, results) => {
+        if (error) {
+            return res.status(500).json({ error: error.message });
+        }
+        res.json({ message: "Feed updated successfully" });
+    });
+});
+
 app.get("/get-subs/:user_id", (req, res) => {
     const user_id = req.params.user_id;
     const query = `SELECT * FROM subscriptions s join channels c where s.channel_id=c.channel_id and s.user_id= ?`;
