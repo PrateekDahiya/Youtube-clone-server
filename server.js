@@ -260,6 +260,18 @@ app.get("/getallchannels", (req, res) => {
     });
 });
 
+app.get("/getfeed", (req, res) => {
+    const user_id = req.query.user_id;
+    const query = `SELECT feed FROM user where user_id= ?`;
+    console.log(user_id);
+    connection.query(query, [user_id], (error, results) => {
+        if (error) {
+            return res.status(500).json({ error: error.message });
+        }
+        res.json({ feed: results });
+    });
+});
+
 app.get("/get-subs/:user_id", (req, res) => {
     const user_id = req.params.user_id;
     const query = `SELECT * FROM subscriptions s join channels c where s.channel_id=c.channel_id and s.user_id= ?`;
