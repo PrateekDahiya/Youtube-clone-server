@@ -29,9 +29,9 @@ connection.connect((err) => {
 });
 
 app.get("/home", (req, res) => {
-    const channel_id = req.query.channel_id;
-    const query = `SELECT * FROM channels c join videos v on c.channel_id=v.channel_id where isShort = 0 order by upload_time desc limit 100`;
-    connection.query(query, (error, results) => {
+    const page_no = req.query.page_no;
+    const query = `SELECT * FROM channels c join videos v on c.channel_id=v.channel_id where isShort = 0 order by upload_time desc limit 24 offset ?`;
+    connection.query(query, [24 * (page_no - 1)], (error, results) => {
         if (error) {
             console.log(error);
         }
@@ -263,7 +263,6 @@ app.get("/getallchannels", (req, res) => {
 app.get("/getfeed", (req, res) => {
     const user_id = req.query.user_id;
     const query = `SELECT feed FROM user where user_id= ?`;
-    console.log(user_id);
     connection.query(query, [user_id], (error, results) => {
         if (error) {
             return res.status(500).json({ error: error.message });
