@@ -28,8 +28,41 @@ connection.connect((err) => {
     console.log("Database Connection Successful!");
 });
 
+// Functions
+const { v4: uuidv4 } = require("uuid");
+
+function generateBase64Uuid(extraInput) {
+    const uuid = uuidv4();
+    const uuidWithoutHyphens = uuid.replace(/-/g, "");
+    const buffer = Buffer.from(uuidWithoutHyphens + extraInput, "hex");
+    const base64Id = buffer.toString("base64");
+    const urlSafeBase64Id = base64Id
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+    return urlSafeBase64Id;
+}
+
+function generateChannelId(userId) {
+    const timestamp = Date.now().toString(16);
+    const base64Id = generateBase64Uuid(userId + timestamp);
+    return `UC${base64Id.substring(0, 22)}`;
+}
+
+function generateVideoId(userId) {
+    const uuid = uuidv4().replace(/-/g, "").substring(0, 12);
+    const extraInput = userId + Date.now().toString(16);
+    const buffer = Buffer.from(uuid + extraInput, "hex");
+    const base64Id = buffer.toString("base64");
+    const urlSafeBase64Id = base64Id
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+    return urlSafeBase64Id;
+}
+
 app.get("/home", (req, res) => {
-    const page_no = req.query.page_no;
+    const page_no = req.query.page;
     const query = `SELECT * FROM channels c join videos v on c.channel_id=v.channel_id where isShort = 0 order by upload_time desc limit 24 offset ?`;
     connection.query(query, [24 * (page_no - 1)], (error, results) => {
         if (error) {
@@ -76,7 +109,7 @@ app.get("/yourchannel", (req, res) => {
 });
 
 app.get("/subscriptions", (req, res) => {
-    const user_id = "UC0fcwXT_xgCBUuuczF-imLQ";
+    const user_id = req.query.user_id;
     const isShort = req.query.isShort;
     const query = `select * from videos v inner join channels c on v.channel_id=c.channel_id where v.channel_id in (select s.channel_id from subscriptions s where s.user_id=?) and v.isShort=? order by upload_time desc limit 100`;
 
@@ -188,6 +221,78 @@ app.get("/search", (req, res) => {
                 videos: results,
                 query: query,
             });
+        }
+    );
+});
+
+app.get("/login", async (req, res) => {
+    const username = req.query.username;
+    const email = req.query.email;
+    const hashpass = req.query.hashpass;
+    const query = `select * from channels c join user u on u.channel_id=c.channel_id where (u.email=? or u.user_id=?) and u.pass=?`;
+    connection.query(query, [email, username, hashpass], (error, results) => {
+        if (error) {
+            console.log("User Not Found: " + error);
+        }
+        res.status(200).json({ user: results[0] });
+    });
+});
+
+app.post("/register", (req, res) => {
+    const values = {
+        fname: req.body.fnamefix,
+        lname: req.body.lnamefix,
+        username: req.body.username,
+        email: req.body.email,
+        hashpass: req.body.hashpass,
+        DOB: req.body.DOB,
+        chl_name: req.body.chl_namefix,
+        chl_desc: req.body.chl_descfix,
+        channel_id: generateChannelId(req.body.username),
+        custom_url: "@" + req.body.username,
+        location: req.body.location,
+    };
+    const channelQuery = `INSERT INTO channels (channel_id, channel_name, short_desc, custom_url, location) VALUES (?, ?, ?, ?, ?)`;
+    connection.query(
+        channelQuery,
+        [
+            values.channel_id,
+            values.chl_name,
+            values.chl_desc,
+            values.custom_url,
+            values.location,
+        ],
+        (error, results) => {
+            if (error) {
+                console.log("Error creating channel: ", error);
+                return res
+                    .status(500)
+                    .json({ error: "Failed to create channel" });
+            }
+            const userQuery = `INSERT INTO user (user_id, username, email, pass, DOB, channel_id) VALUES (?, ?, ?, ?, ?, ?)`;
+            connection.query(
+                userQuery,
+                [
+                    values.username,
+                    values.fname + " " + values.lname,
+                    values.email,
+                    values.hashpass,
+                    values.DOB,
+                    values.channel_id,
+                ],
+                (error, results) => {
+                    if (error) {
+                        console.log("Error registering user: ", error);
+                        return res
+                            .status(500)
+                            .json({ error: "Failed to register user" });
+                    }
+
+                    return res
+                        .status(200)
+                        .json({ message: "Registration successful" });
+                }
+            );
         }
     );
 });
