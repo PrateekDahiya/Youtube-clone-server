@@ -63,7 +63,7 @@ function generateVideoId(userId) {
 
 app.get("/home", (req, res) => {
     const page_no = req.query.page;
-    const query = `SELECT * FROM channels c join videos v on c.channel_id=v.channel_id where isShort = 0 order by upload_time desc limit 24 offset ?`;
+    const query = `SELECT * FROM channels c join videos v on c.channel_id=v.channel_id where isShort = 0 order by rand() desc limit 24 offset ?`;
     connection.query(query, [24 * (page_no - 1)], (error, results) => {
         if (error) {
             console.log(error);
@@ -187,7 +187,7 @@ app.get("/category", (req, res) => {
         fashionbeauty: ["Pets & Animals", "Travel & Events"],
         shopping: ["Autos & Vehicles"],
     };
-    const query = `select * from videos v join channels c on v.channel_id=c.channel_id where v.category in (?) and v.isShort = ? order by upload_time desc limit 100`;
+    const query = `select * from videos v join channels c on v.channel_id=c.channel_id where v.category in (?) and v.isShort = ? order by rand() desc limit 100`;
     connection.query(
         query,
         [categoryMapping[category], type],
@@ -223,6 +223,20 @@ app.get("/search", (req, res) => {
             });
         }
     );
+});
+
+app.get("/likedvideos", (req, res) => {
+    const user_id = req.query.user_id;
+    const query = `SELECT v.*, c.* FROM likedvideos lv JOIN videos v ON lv.video_id = v.video_id JOIN channels c ON v.channel_id = c.channel_id WHERE lv.user_id = ? order by liked_time desc limit 100`;
+    connection.query(query, [user_id], (error, results) => {
+        if (error) {
+            console.log(error);
+        }
+        res.status(200).json({
+            page: "likedvideos",
+            videos: results,
+        });
+    });
 });
 
 app.get("/login", async (req, res) => {
@@ -269,7 +283,9 @@ app.post("/register", (req, res) => {
                     .status(500)
                     .json({ error: "Failed to create channel" });
             }
-            const userQuery = `INSERT INTO user (user_id, username, email, pass, DOB, channel_id) VALUES (?, ?, ?, ?, ?, ?)`;
+            const userQuery = `INSERT INTO user (user_id, username, email, pass, DOB, channel_id) 
+                                VALUES (?, ?, ?, ?, ?, ?)
+                                ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), username = VALUES(user_id),email = VALUES(email),DOB=VALUES(DOB),channel_id=VALUES(channel_id)`;
             connection.query(
                 userQuery,
                 [
@@ -354,6 +370,156 @@ app.get("/getvideosofchannel", (req, res) => {
     }
 });
 
+app.post("/addtosubs", (req, res) => {
+    const user_chl_id = req.body.user_chl_id;
+    const channel_id = req.body.channel_id;
+    const query = `INSERT INTO subscriptions (user_id,channel_id) VALUES (?, ?)`;
+
+    connection.query(query, [user_chl_id, channel_id], (error, results) => {
+        if (error) {
+            console.error(error);
+            return res.status(500).json({ error: "Database query failed" });
+        }
+
+        res.status(200).json({
+            success: true,
+            comment: "Subcriber added success",
+        });
+    });
+});
+
+app.post("/removefromsubs", (req, res) => {
+    const user_chl_id = req.body.user_chl_id;
+    const channel_id = req.body.channel_id;
+
+    if (!user_chl_id || !channel_id) {
+        return res
+            .status(400)
+            .json({ error: "user_chl_id and channel_id are required" });
+    }
+
+    const query = `DELETE FROM subscriptions WHERE user_id = ? AND channel_id = ?`;
+
+    connection.query(query, [user_chl_id, channel_id], (error, results) => {
+        if (error) {
+            console.error(error);
+            return res.status(500).json({ error: "Database query failed" });
+        }
+
+        if (results.affectedRows === 0) {
+            return res.status(404).json({ error: "Subscription not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            comment: "Subscription removed successfully",
+        });
+    });
+});
+
+app.get("/issub", (req, res) => {
+    const user_chl = req.query.user_id;
+    const channel_id = req.query.channel_id;
+
+    if (!user_chl || !channel_id) {
+        return res
+            .status(400)
+            .json({ error: "user_id and channel_id are required" });
+    }
+
+    const query = `SELECT * FROM subscriptions WHERE user_id = ? AND channel_id = ?`;
+    connection.query(query, [user_chl, channel_id], (error, results) => {
+        if (error) {
+            return res.status(500).json({ error: "Database query error" });
+        }
+        if (results.length > 0) {
+            return res.status(200).json({ sub: true });
+        } else {
+            return res.status(200).json({ sub: false });
+        }
+    });
+});
+
+app.post("/addtoliked", (req, res) => {
+    const user_id = req.body.user_id;
+    const video_id = req.body.video_id;
+
+    if (!user_id || !video_id) {
+        return res
+            .status(400)
+            .json({ error: "user_id and video_id are required" });
+    }
+
+    const query = `INSERT INTO likedvideos (user_id, video_id) VALUES (?, ?)`;
+
+    connection.query(query, [user_id, video_id], (error, results) => {
+        if (error) {
+            console.error(error);
+            return res.status(500).json({ error: "Database query failed" });
+        }
+
+        res.status(200).json({
+            success: true,
+            comment: "Video liked successfully",
+        });
+    });
+});
+
+app.post("/removefromliked", (req, res) => {
+    const user_id = req.body.user_id;
+    const video_id = req.body.video_id;
+
+    if (!user_id || !video_id) {
+        return res
+            .status(400)
+            .json({ error: "user_id and video_id are required" });
+    }
+
+    const query = `DELETE FROM likedvideos WHERE user_id = ? AND video_id = ?`;
+
+    connection.query(query, [user_id, video_id], (error, results) => {
+        if (error) {
+            console.error(error);
+            return res.status(500).json({ error: "Database query failed" });
+        }
+
+        if (results.affectedRows === 0) {
+            return res.status(404).json({ error: "Like not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            comment: "Like removed successfully",
+        });
+    });
+});
+
+app.get("/isliked", (req, res) => {
+    const user_id = req.query.user_id;
+    const video_id = req.query.video_id;
+
+    if (!user_id || !video_id) {
+        return res
+            .status(400)
+            .json({ error: "user_id and video_id are required" });
+    }
+
+    const query = `SELECT * FROM likedvideos WHERE user_id = ? AND video_id = ?`;
+
+    connection.query(query, [user_id, video_id], (error, results) => {
+        if (error) {
+            console.error(error);
+            return res.status(500).json({ error: "Database query failed" });
+        }
+
+        if (results.length > 0) {
+            return res.status(200).json({ liked: true });
+        } else {
+            return res.status(200).json({ liked: false });
+        }
+    });
+});
+
 app.get("/getallchannels", (req, res) => {
     const query = `select channel_id from channels`;
 
@@ -389,9 +555,9 @@ app.post("/updatefeed", (req, res) => {
     });
 });
 
-app.get("/get-subs/:user_id", (req, res) => {
-    const user_id = req.params.user_id;
-    const query = `SELECT * FROM subscriptions s join channels c where s.channel_id=c.channel_id and s.user_id= ?`;
+app.get("/get-subs", (req, res) => {
+    const user_id = req.query.user_id;
+    const query = `SELECT * FROM subscriptions s join channels c where s.channel_id=c.channel_id and s.user_id= ? order by sub_time desc`;
 
     connection.query(query, [user_id], (error, results) => {
         if (error) {
