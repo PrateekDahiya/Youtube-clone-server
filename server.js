@@ -239,6 +239,20 @@ app.get("/likedvideos", (req, res) => {
     });
 });
 
+app.get("/watchlater", (req, res) => {
+    const user_id = req.query.user_id;
+    const query = `SELECT v.*, c.* FROM watchlater lv JOIN videos v ON lv.video_id = v.video_id JOIN channels c ON v.channel_id = c.channel_id WHERE lv.user_id = ? order by added_time desc limit 100`;
+    connection.query(query, [user_id], (error, results) => {
+        if (error) {
+            console.log(error);
+        }
+        res.status(200).json({
+            page: "watchlater",
+            videos: results,
+        });
+    });
+});
+
 app.get("/login", async (req, res) => {
     const username = req.query.username;
     const email = req.query.email;
@@ -534,8 +548,7 @@ app.post("/addtohistory", (req, res) => {
             .json({ error: "user_id and video_id are required" });
     }
 
-    const query = `INSERT INTO history (user_id, video_id) VALUES (?, ?)`;
-
+    const query = `INSERT INTO history (user_id, video_id, watched_time) VALUES (?, ?, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE watched_time = CURRENT_TIMESTAMP`;
     connection.query(query, [user_id, video_id], (error, results) => {
         if (error) {
             console.error(error);
@@ -549,7 +562,7 @@ app.post("/addtohistory", (req, res) => {
     });
 });
 
-app.post("/removefromHistory", (req, res) => {
+app.post("/removefromhistory", (req, res) => {
     const user_id = req.body.user_id;
     const video_id = req.body.video_id;
 
@@ -586,6 +599,89 @@ app.get("/history", (req, res) => {
             return res.status(500).json({ error: error.message });
         }
         res.status(200).json({ videos: results });
+    });
+});
+
+// Watch Later
+
+// Likes
+app.post("/addtowatchlater", (req, res) => {
+    const user_id = req.body.user_id;
+    const video_id = req.body.video_id;
+
+    if (!user_id || !video_id) {
+        return res
+            .status(400)
+            .json({ error: "user_id and video_id are required" });
+    }
+
+    const query = `INSERT INTO watchlater (user_id, video_id,added_time) VALUES (?, ?,CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE added_time = CURRENT_TIMESTAMP`;
+
+    connection.query(query, [user_id, video_id], (error, results) => {
+        if (error) {
+            console.error(error);
+            return res.status(500).json({ error: "Database query failed" });
+        }
+
+        res.status(200).json({
+            success: true,
+            comment: "watchlater added successfully",
+        });
+    });
+});
+
+app.post("/removefromwatchlater", (req, res) => {
+    const user_id = req.body.user_id;
+    const video_id = req.body.video_id;
+
+    if (!user_id || !video_id) {
+        return res
+            .status(400)
+            .json({ error: "user_id and video_id are required" });
+    }
+
+    const query = `DELETE FROM watchlater WHERE user_id = ? AND video_id = ?`;
+
+    connection.query(query, [user_id, video_id], (error, results) => {
+        if (error) {
+            console.error(error);
+            return res.status(500).json({ error: "Database query failed" });
+        }
+
+        if (results.affectedRows === 0) {
+            return res.status(404).json({ error: "watchlater not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            comment: "watchlater removed successfully",
+        });
+    });
+});
+
+app.get("/iswatchlater", (req, res) => {
+    const user_id = req.query.user_id;
+    const video_id = req.query.video_id;
+
+    if (!user_id || !video_id) {
+        return res
+            .status(400)
+            .json({ error: "user_id and video_id are required" });
+    }
+
+    const query = `SELECT * FROM watchlater WHERE user_id = ? AND video_id = ?`;
+
+    connection.query(query, [user_id, video_id], (error, results) => {
+        if (error) {
+            console.error(error);
+            return res.status(500).json({ error: "Database query failed" });
+        }
+
+        if (results.length > 0) {
+            return res.status(200).json({ watchlater: true });
+        } else {
+            return res.status(200).json({ watchlater: false });
+        }
     });
 });
 
