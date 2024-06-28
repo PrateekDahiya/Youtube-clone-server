@@ -748,7 +748,7 @@ function executeCommand(command) {
 }
 
 // const volumePath = process.env.VOLUME_PATH || "/root/ytdlp";
-// const ytdlpPath = path.join(volumePath, "yt-dlp");
+const ytdlpPath = "yt-dlp";
 
 // if (!fs.existsSync(volumePath)) {
 //     fs.mkdirSync(volumePath, { recursive: true });
