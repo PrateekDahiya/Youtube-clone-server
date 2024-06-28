@@ -1,9 +1,7 @@
 const express = require("express");
 const path = require("path");
 const app = express();
-const { google } = require("googleapis");
 const mysql = require("mysql2");
-const axios = require("axios");
 require("dotenv").config();
 const { exec } = require("child_process");
 const port = process.env.PORT;
