@@ -370,6 +370,7 @@ app.get("/getvideosofchannel", (req, res) => {
     }
 });
 
+// Subscriptions
 app.post("/addtosubs", (req, res) => {
     const user_chl_id = req.body.user_chl_id;
     const channel_id = req.body.channel_id;
@@ -440,6 +441,7 @@ app.get("/issub", (req, res) => {
     });
 });
 
+// Likes
 app.post("/addtoliked", (req, res) => {
     const user_id = req.body.user_id;
     const video_id = req.body.video_id;
@@ -517,6 +519,62 @@ app.get("/isliked", (req, res) => {
         } else {
             return res.status(200).json({ liked: false });
         }
+    });
+});
+
+// History
+
+app.post("/addtohistory", (req, res) => {
+    const user_id = req.body.user_id;
+    const video_id = req.body.video_id;
+
+    if (!user_id || !video_id) {
+        return res
+            .status(400)
+            .json({ error: "user_id and video_id are required" });
+    }
+
+    const query = `INSERT INTO history (user_id, video_id) VALUES (?, ?)`;
+
+    connection.query(query, [user_id, video_id], (error, results) => {
+        if (error) {
+            console.error(error);
+            return res.status(500).json({ error: "Database query failed" });
+        }
+
+        res.status(200).json({
+            success: true,
+            comment: "Video added to history successfully",
+        });
+    });
+});
+
+app.post("/removefromHistory", (req, res) => {
+    const user_id = req.body.user_id;
+    const video_id = req.body.video_id;
+
+    if (!user_id || !video_id) {
+        return res
+            .status(400)
+            .json({ error: "user_id and video_id are required" });
+    }
+
+    const query = `DELETE FROM history WHERE user_id = ? AND video_id = ?`;
+
+    connection.query(query, [user_id, video_id], (error, results) => {
+        if (error) {
+            console.error(error);
+            return res.status(500).json({ error: "Database query failed" });
+        }
+
+        if (results.affectedRows === 0) {
+            return res.status(404).json({ error: "History not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            comment: "History removed successfully",
+        });
     });
 });
 
