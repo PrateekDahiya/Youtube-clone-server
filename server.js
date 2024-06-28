@@ -1,14 +1,12 @@
 const express = require("express");
 const path = require("path");
-const fs = require("fs");
 const app = express();
+const { google } = require("googleapis");
 const mysql = require("mysql2");
 const axios = require("axios");
 require("dotenv").config();
 const { exec } = require("child_process");
 const port = process.env.PORT;
-
-const multer = require("multer");
 const cors = require("cors");
 
 app.use(express.json());
@@ -751,35 +749,33 @@ function executeCommand(command) {
     });
 }
 
-const volumePath = process.env.VOLUME_PATH || "/root/ytdlp";
-const ytdlpPath = path.join(volumePath, "yt-dlp");
+// const volumePath = process.env.VOLUME_PATH || "/root/ytdlp";
+// const ytdlpPath = path.join(volumePath, "yt-dlp");
 
-if (!fs.existsSync(volumePath)) {
-    fs.mkdirSync(volumePath, { recursive: true });
-}
+// if (!fs.existsSync(volumePath)) {
+//     fs.mkdirSync(volumePath, { recursive: true });
+// }
 
-// Configure storage to keep the original filename
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, volumePath);
-    },
-    filename: function (req, file, cb) {
-        cb(null, file.originalname);
-    },
-});
+// // Configure storage to keep the original filename
+// const storage = multer.diskStorage({
+//     destination: function (req, file, cb) {
+//         cb(null, volumePath);
+//     },
+//     filename: function (req, file, cb) {
+//         cb(null, file.originalname);
+//     },
+// });
 
-const upload = multer({ storage: storage });
+// app.post("/upload", upload.single("file"), (req, res) => {
+//     if (!req.file) {
+//         return res.status(400).send("No file uploaded.");
+//     }
 
-app.post("/upload", upload.single("file"), (req, res) => {
-    if (!req.file) {
-        return res.status(400).send("No file uploaded.");
-    }
+//     const file = req.file;
+//     const filePath = path.join(volumePath, file.originalname);
 
-    const file = req.file;
-    const filePath = path.join(volumePath, file.originalname);
-
-    res.status(200).send("File uploaded successfully.");
-});
+//     res.status(200).send("File uploaded successfully.");
+// });
 
 app.get("/get-stream-url", async (req, res) => {
     const videoId = req.query.video_id;
