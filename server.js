@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 const app = express();
 const mysql = require("mysql2");
 const axios = require("axios");
@@ -748,7 +749,24 @@ function executeCommand(command) {
     });
 }
 
-const ytdlpPath = "yt-dlp";
+const volumePath = process.env.VOLUME_PATH || "/root/ytdlp";
+
+const ytdlpPath = `${volumePath}yt-dlp`;
+
+if (!fs.existsSync(volumePath)) {
+    fs.mkdirSync(volumePath, { recursive: true });
+}
+
+app.post("/upload", (req, res) => {
+    const file = req.files.file;
+    const filePath = path.join(volumePath, file.name);
+    file.mv(filePath, (err) => {
+        if (err) {
+            return res.status(500).send(err);
+        }
+        res.send("File uploaded!");
+    });
+});
 
 app.get("/get-stream-url", async (req, res) => {
     const videoId = req.query.video_id;
