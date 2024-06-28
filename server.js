@@ -7,6 +7,8 @@ const axios = require("axios");
 require("dotenv").config();
 const { exec } = require("child_process");
 const port = process.env.PORT;
+
+const multer = require("multer");
 const cors = require("cors");
 
 app.use(express.json());
@@ -750,22 +752,33 @@ function executeCommand(command) {
 }
 
 const volumePath = process.env.VOLUME_PATH || "/root/ytdlp";
-
-const ytdlpPath = `${volumePath}yt-dlp`;
+const ytdlpPath = path.join(volumePath, "yt-dlp");
 
 if (!fs.existsSync(volumePath)) {
     fs.mkdirSync(volumePath, { recursive: true });
 }
 
-app.post("/upload", (req, res) => {
-    const file = req.files.file;
-    const filePath = path.join(volumePath, file.name);
-    file.mv(filePath, (err) => {
-        if (err) {
-            return res.status(500).send(err);
-        }
-        res.send("File uploaded!");
-    });
+// Configure storage to keep the original filename
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, volumePath);
+    },
+    filename: function (req, file, cb) {
+        cb(null, file.originalname);
+    },
+});
+
+const upload = multer({ storage: storage });
+
+app.post("/upload", upload.single("file"), (req, res) => {
+    if (!req.file) {
+        return res.status(400).send("No file uploaded.");
+    }
+
+    const file = req.file;
+    const filePath = path.join(volumePath, file.originalname);
+
+    res.status(200).send("File uploaded successfully.");
 });
 
 app.get("/get-stream-url", async (req, res) => {
