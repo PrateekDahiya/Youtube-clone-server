@@ -578,6 +578,17 @@ app.post("/removefromHistory", (req, res) => {
     });
 });
 
+app.get("/history", (req, res) => {
+    const user_id = req.query.user_id;
+    const query = `SELECT v.*, c.*,h.watched_time FROM history h JOIN videos v ON h.video_id = v.video_id JOIN channels c ON v.channel_id = c.channel_id WHERE h.user_id = ? ORDER BY h.watched_time DESC LIMIT 100`;
+    connection.query(query, [user_id], (error, results) => {
+        if (error) {
+            return res.status(500).json({ error: error.message });
+        }
+        res.status(200).json({ videos: results });
+    });
+});
+
 app.get("/getallchannels", (req, res) => {
     const query = `select channel_id from channels`;
 
