@@ -77,11 +77,12 @@ app.get("/home", (req, res) => {
 
 app.get("/shorts", (req, res) => {
     const video_id = req.query.video_id;
+    const needmore = req.query.needmore;
     if (video_id) {
-        const query = `(SELECT video_id FROM videos WHERE video_id = ?) UNION ALL (SELECT video_id FROM videos WHERE channel_id = (SELECT channel_id FROM videos WHERE video_id = ?) AND video_id != ? ORDER BY upload_time)`;
+        const query = `(SELECT * FROM videos v1 inner join channels c1 on c1.channel_id=v1.channel_id WHERE video_id = ?) UNION ALL (SELECT * FROM videos v2 inner join channels c2 on v2.channel_id=c2.channel_id WHERE c2.channel_id = (SELECT v3.channel_id FROM videos v3 WHERE v3.video_id = ?) AND v2.video_id != ? ORDER BY upload_time) LIMIT 10 offset ?`;
         connection.query(
             query,
-            [video_id, video_id, video_id],
+            [video_id, video_id, video_id, 10 * needmore],
             (error, results) => {
                 if (error) {
                     console.log(error);
@@ -90,8 +91,8 @@ app.get("/shorts", (req, res) => {
             }
         );
     } else {
-        const query = `SELECT video_id FROM videos where isShort = 1 order by upload_time desc limit 100`;
-        connection.query(query, (error, results) => {
+        const query = `SELECT * FROM videos v inner join channels c on v.channel_id=c.channel_id where isShort = 1 order by RAND() desc limit 10 offset ?`;
+        connection.query(query, [10 * needmore], (error, results) => {
             if (error) {
                 console.log(error);
             }
@@ -800,6 +801,16 @@ app.get("/get-stream-url", async (req, res) => {
         console.error(`Error fetching stream URL.`);
         res.status(500).send("An error occurred while fetching the stream URL");
     }
+});
+
+app.get("/get-channel-ids", (req, res) => {
+    const query = `SELECT channel_id FROM channels`;
+    connection.query(query, (error, results) => {
+        if (error) {
+            return res.status(500).json({ error: error.message });
+        }
+        res.json({ channelIds: results });
+    });
 });
 
 app.listen(port, () => console.log(`Server on port: ${port}`));
