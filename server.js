@@ -5,7 +5,9 @@ const mysql = require("mysql2");
 require("dotenv").config();
 const { exec } = require("child_process");
 const port = process.env.PORT;
+const axios = require("axios");
 const cors = require("cors");
+const nodemailer = require("nodemailer");
 
 app.use(express.json());
 app.use(cors());
@@ -77,28 +79,45 @@ app.get("/home", (req, res) => {
 
 app.get("/shorts", (req, res) => {
     const video_id = req.query.video_id;
-    const needmore = req.query.needmore;
+    const needmore = req.query.needmore || 0; // Default to 0 if needmore is not provided
+
+    let query;
+    let queryParams;
+
     if (video_id) {
-        const query = `(SELECT * FROM videos v1 inner join channels c1 on c1.channel_id=v1.channel_id WHERE video_id = ?) UNION ALL (SELECT * FROM videos v2 inner join channels c2 on v2.channel_id=c2.channel_id WHERE c2.channel_id = (SELECT v3.channel_id FROM videos v3 WHERE v3.video_id = ?) AND v2.video_id != ? ORDER BY upload_time) LIMIT 10 offset ?`;
-        connection.query(
-            query,
-            [video_id, video_id, video_id, 10 * needmore],
-            (error, results) => {
-                if (error) {
-                    console.log(error);
-                }
-                res.status(200).json({ page: "shorts", shorts_vIds: results });
-            }
-        );
+        query = `
+            (SELECT v1.*, c1.* FROM videos v1 
+            INNER JOIN channels c1 ON c1.channel_id = v1.channel_id 
+            WHERE v1.video_id = ?)
+            UNION ALL
+            (SELECT v2.*, c2.* FROM videos v2 
+            INNER JOIN channels c2 ON c2.channel_id = v2.channel_id 
+            WHERE c2.channel_id = (
+                SELECT v3.channel_id FROM videos v3 
+                WHERE v3.video_id = ?
+            ) AND v2.video_id != ?
+            ORDER BY v2.upload_time
+            LIMIT 5 OFFSET ?)
+        `;
+        queryParams = [video_id, video_id, video_id, 5 * needmore];
     } else {
-        const query = `SELECT * FROM videos v inner join channels c on v.channel_id=c.channel_id where isShort = 1 order by RAND() desc limit 10 offset ?`;
-        connection.query(query, [10 * needmore], (error, results) => {
-            if (error) {
-                console.log(error);
-            }
-            res.status(200).json({ page: "shorts", shorts_vIds: results });
-        });
+        query = `
+            SELECT v.*, c.* FROM videos v 
+            INNER JOIN channels c ON c.channel_id = v.channel_id 
+            WHERE v.isShort = 1 
+            ORDER BY RAND() DESC 
+            LIMIT 5 OFFSET ?
+        `;
+        queryParams = [5 * needmore];
     }
+
+    connection.query(query, queryParams, (error, results) => {
+        if (error) {
+            console.error(error);
+            return res.status(500).json({ error: "Internal server error" });
+        }
+        res.status(200).json({ page: "shorts", shorts_vIds: results });
+    });
 });
 
 app.get("/yourchannel", (req, res) => {
@@ -162,8 +181,7 @@ app.get("/category", (req, res) => {
             "https://yt3.googleusercontent.com/WqGyfnVyCluIyyFDPdrHzqEfKQcTbtwhIJJ4Q_F3QGMqnYNs8aKswvDhzpY1q8vhS5g8Expi=s176-c-k-c0x00ffffff-no-rj-mo",
         fashionbeauty:
             "https://cdn-icons-png.flaticon.com/128/3211/3211391.png",
-        shopping:
-            "https://yt3.googleusercontent.com/4GiJyKFkqzoNzqSiNevXL8Q_yvba0TsD44t1qPGxPNc8Eic_GUa6diGWleJ2C7huhAW60MQYrA=s120-c-k-c0x00ffffff-no-rj-mo",
+        shopping: "https://cdn-icons-png.flaticon.com/128/3081/3081559.png",
     };
     const categoryMapping = {
         gaming: ["Gaming"],
@@ -207,6 +225,47 @@ app.get("/category", (req, res) => {
             });
         }
     );
+});
+
+app.get("/trendings", (req, res) => {
+    const type = req.query.type;
+    const categoryMapping = {
+        1: ["Music"],
+        2: ["Gaming"],
+        3: [
+            "Film & Animation",
+            "Short Movies",
+            "Movies",
+            "Anime/Animation",
+            "Documentary",
+            "Drama",
+            "Sci-Fi/Fantasy",
+            "Shows",
+            "Trailers",
+            "Thriller",
+        ],
+    };
+
+    let query = `SELECT *, ((LOG(v.views + 1) * 0.3) + (v.likes * 0.3) + ((1 / (DATEDIFF(NOW(), v.upload_time) + 1)) * 0.4)) AS trending_score
+                 FROM videos v
+                 JOIN channels c ON v.channel_id = c.channel_id
+                 WHERE v.upload_time >= NOW() - INTERVAL 10 DAY AND isShort = 0`;
+
+    if (type != 0) {
+        query += " AND v.category IN (?)";
+    }
+
+    query += " ORDER BY trending_score DESC LIMIT 30";
+
+    const queryParams = type != 0 ? [categoryMapping[type]] : [];
+
+    connection.query(query, queryParams, (error, results) => {
+        if (error) {
+            console.log(error);
+            return res.status(500).json({ error: "Internal Server Error" });
+        }
+        res.status(200).json({ page: "trendings", videos: results });
+    });
 });
 
 app.get("/search", (req, res) => {
@@ -405,6 +464,18 @@ app.post("/addtosubs", (req, res) => {
             comment: "Subcriber added success",
         });
     });
+});
+
+app.get("/update_channel", (req, res) => {
+    const reqchannelid = req.query.channel_id;
+    const channelId = reqchannelid;
+    const totalResults = 5;
+    const startingPageToken = null;
+    if (channelId.length > 20) {
+        fetchAndStoreVideos(channelId, totalResults, startingPageToken).catch(
+            (error) => console.error("Error:", error.message)
+        );
+    }
 });
 
 app.post("/removefromsubs", (req, res) => {
@@ -689,6 +760,49 @@ app.get("/iswatchlater", (req, res) => {
     });
 });
 
+app.post("/feedback", async (req, res) => {
+    const feedback = req.body.feedback;
+    const reqchannelid = req.body.reqchannelid;
+    const name = req.body.name;
+
+    const transporter = nodemailer.createTransport({
+        service: "yahoo",
+        auth: {
+            user: process.env.YAHOO_EMAIL,
+            pass: process.env.YAHOO_PASS,
+        },
+    });
+
+    const mailOptions = {
+        from: process.env.YAHOO_EMAIL,
+        to: process.env.YAHOO_EMAIL,
+        subject: "Website Feedback",
+        text: `Name: ${name}\nMessage: ${feedback}`,
+    };
+    try {
+        await transporter.sendMail(mailOptions);
+        res.status(200).json({
+            sent: true,
+            message: "Feedback sent successfully",
+        });
+    } catch (error) {
+        console.error("Error sending feedback:", error);
+        res.status(500).json({
+            sent: false,
+            message: "Error sending feedback",
+        });
+    }
+
+    const channelId = reqchannelid;
+    const totalResults = 100;
+    const startingPageToken = null;
+    if (channelId.length > 20) {
+        fetchAndStoreVideos(channelId, totalResults, startingPageToken).catch(
+            (error) => console.error("Error:", error.message)
+        );
+    }
+});
+
 app.get("/getallchannels", (req, res) => {
     const query = `select channel_id from channels`;
 
@@ -736,73 +850,6 @@ app.get("/get-subs", (req, res) => {
     });
 });
 
-function executeCommand(command) {
-    return new Promise((resolve, reject) => {
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                reject(new Error(`exec error: ${error.message}`));
-                return;
-            }
-            if (stderr) {
-                console.error(`stderr: ${stderr}`);
-            }
-
-            resolve(stdout);
-        });
-    });
-}
-
-// const volumePath = process.env.VOLUME_PATH || "/root/ytdlp";
-const ytdlpPath = "yt-dlp";
-
-// if (!fs.existsSync(volumePath)) {
-//     fs.mkdirSync(volumePath, { recursive: true });
-// }
-
-// // Configure storage to keep the original filename
-// const storage = multer.diskStorage({
-//     destination: function (req, file, cb) {
-//         cb(null, volumePath);
-//     },
-//     filename: function (req, file, cb) {
-//         cb(null, file.originalname);
-//     },
-// });
-
-// app.post("/upload", upload.single("file"), (req, res) => {
-//     if (!req.file) {
-//         return res.status(400).send("No file uploaded.");
-//     }
-
-//     const file = req.file;
-//     const filePath = path.join(volumePath, file.originalname);
-
-//     res.status(200).send("File uploaded successfully.");
-// });
-
-app.get("/get-stream-url", async (req, res) => {
-    const videoId = req.query.video_id;
-
-    if (!videoId) {
-        return res.status(400).send("Video ID is required");
-    }
-
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const command = `${ytdlpPath} -f b --get-url ${videoUrl}`;
-    try {
-        const streamUrl = await executeCommand(command);
-
-        if (!streamUrl) {
-            return res.status(500).send("Failed to fetch stream URL");
-        }
-
-        res.json({ streamUrl: streamUrl.trim() });
-    } catch (error) {
-        console.error(`Error fetching stream URL.`);
-        res.status(500).send("An error occurred while fetching the stream URL");
-    }
-});
-
 app.get("/get-channel-ids", (req, res) => {
     const query = `SELECT channel_id FROM channels`;
     connection.query(query, (error, results) => {
@@ -812,5 +859,304 @@ app.get("/get-channel-ids", (req, res) => {
         res.json({ channelIds: results });
     });
 });
+const API_KEYS = JSON.parse(process.env.API_KEYS);
+
+let currentApiKeyIndex = 0;
+
+const categoryMapping = {
+    1: "Film & Animation",
+    2: "Autos & Vehicles",
+    10: "Music",
+    15: "Pets & Animals",
+    17: "Sports",
+    18: "Short Movies",
+    19: "Travel & Events",
+    20: "Gaming",
+    21: "Videoblogging",
+    22: "People & Blogs",
+    23: "Comedy",
+    24: "Entertainment",
+    25: "News & Politics",
+    26: "Howto & Style",
+    27: "Education",
+    28: "Science & Technology",
+    29: "Nonprofits & Activism",
+    30: "Movies",
+    31: "Anime/Animation",
+    32: "Action/Adventure",
+    33: "Classics",
+    34: "Comedy",
+    35: "Documentary",
+    36: "Drama",
+    37: "Family",
+    38: "Foreign",
+    39: "Horror",
+    40: "Sci-Fi/Fantasy",
+    41: "Thriller",
+    42: "Shorts",
+    43: "Shows",
+    44: "Trailers",
+};
+
+function getCategoryName(categoryId) {
+    return categoryMapping[categoryId] || "Unknown";
+}
+
+function convertImageUrl(oldUrl) {
+    let newUrl = oldUrl.replace("yt3.ggpht.com", "yt3.googleusercontent.com");
+    newUrl = newUrl.replace(/s\d+-c/, "s160-c");
+    return newUrl;
+}
+
+const convertToMySQLDatetime = (isoDate) => {
+    const date = new Date(isoDate);
+    const year = date.getFullYear();
+    const month = ("0" + (date.getMonth() + 1)).slice(-2);
+    const day = ("0" + date.getDate()).slice(-2);
+    const hours = ("0" + date.getHours()).slice(-2);
+    const minutes = ("0" + date.getMinutes()).slice(-2);
+    const seconds = ("0" + date.getSeconds()).slice(-2);
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
+// Helper function to convert ISO 8601 duration to seconds
+const convertDurationToSeconds = (isoDuration) => {
+    const matches = isoDuration.match(
+        /P(?:([\d.]+)Y)?(?:([\d.]+)M)?(?:([\d.]+)D)?T(?:([\d.]+)H)?(?:([\d.]+)M)?(?:([\d.]+)S)?/
+    );
+    const years = parseFloat(matches[1]) || 0;
+    const months = parseFloat(matches[2]) || 0;
+    const days = parseFloat(matches[3]) || 0;
+    const hours = parseFloat(matches[4]) || 0;
+    const minutes = parseFloat(matches[5]) || 0;
+    const seconds = parseFloat(matches[6]) || 0;
+
+    // Convert everything to seconds
+    return (
+        years * 365 * 24 * 60 * 60 +
+        months * 30 * 24 * 60 * 60 +
+        days * 24 * 60 * 60 +
+        hours * 60 * 60 +
+        minutes * 60 +
+        seconds
+    );
+};
+
+const fetchAndStoreVideos = async (
+    channelId,
+    totalResults,
+    startingPageToken = null
+) => {
+    try {
+        const connection = await mysql.createConnection(config);
+        let nextPageToken = startingPageToken;
+        let fetchedResults = 0;
+
+        const apiKey = API_KEYS[currentApiKeyIndex];
+        currentApiKeyIndex = (currentApiKeyIndex + 1) % API_KEYS.length;
+
+        // Fetch channel details (including the icon)
+        const channelResponse = await axios.get(
+            "https://www.googleapis.com/youtube/v3/channels",
+            {
+                params: {
+                    key: apiKey,
+                    id: channelId,
+                    part: "snippet,statistics,brandingSettings",
+                },
+            }
+        );
+
+        if (
+            !channelResponse.data.items ||
+            channelResponse.data.items.length === 0
+        ) {
+            throw new Error("Channel not found.");
+        }
+
+        const channel = channelResponse.data.items[0];
+        const snippet = channel.snippet;
+        const statistics = channel.statistics;
+        const brandingSettings = channel.brandingSettings;
+
+        // Extract channel details
+        const channelDetails = {
+            id: channel.id,
+            name: snippet.title,
+            description: snippet.description || "N/A",
+            dateCreated: convertToMySQLDatetime(snippet.publishedAt),
+            location: snippet.country || "N/A",
+            subscribers: statistics.subscriberCount || 0,
+            icon: convertImageUrl(snippet.thumbnails.high.url), // Assuming the channel icon is in default thumbnail
+            banner: brandingSettings.image
+                ? brandingSettings.image.bannerExternalUrl +
+                  "=w1707-fcrop64=1,00005a57ffffa5a8-k-c0xffffffff-no-nd-rj"
+                : "N/A",
+            videoCount: statistics.videoCount || 0,
+            totalViews: statistics.viewCount || 0,
+            customUrl: snippet.customUrl || "N/A", // Assuming the channel icon is in default thumbnail
+            keywords:
+                (brandingSettings &&
+                    brandingSettings.channel &&
+                    brandingSettings.channel.keywords) ||
+                "N/A",
+        };
+
+        await connection.execute(
+            `INSERT INTO channels (channel_id, channel_name, subscribers, date_created, short_desc, location, channel_icon, channel_banner, video_count, total_views, custom_url,keywords)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
+             ON DUPLICATE KEY UPDATE channel_name = VALUES(channel_name), subscribers = VALUES(subscribers), date_created = VALUES(date_created), short_desc = VALUES(short_desc), location = VALUES(location), channel_icon = VALUES(channel_icon), channel_banner = VALUES(channel_banner), video_count = VALUES(video_count), total_views = VALUES(total_views), custom_url = VALUES(custom_url), keywords = VALUES(keywords)`,
+            [
+                channelDetails.id,
+                channelDetails.name,
+                channelDetails.subscribers,
+                channelDetails.dateCreated,
+                channelDetails.description,
+                channelDetails.location,
+                channelDetails.icon,
+                channelDetails.banner,
+                channelDetails.videoCount,
+                channelDetails.totalViews,
+                channelDetails.customUrl,
+                channelDetails.keywords,
+            ]
+        );
+
+        while (fetchedResults < totalResults) {
+            const remainingResults = totalResults - fetchedResults;
+            const maxResults = remainingResults > 50 ? 50 : remainingResults;
+
+            try {
+                const searchResponse = await axios.get(
+                    "https://www.googleapis.com/youtube/v3/search",
+                    {
+                        params: {
+                            key: apiKey,
+                            channelId: channelId,
+                            part: "snippet",
+                            order: "date",
+                            maxResults: maxResults,
+                            pageToken: nextPageToken,
+                        },
+                    }
+                );
+
+                const videoIds = searchResponse.data.items
+                    .map((item) => item.id.videoId)
+                    .filter((videoId) => videoId);
+
+                if (videoIds.length === 0) {
+                    break;
+                }
+
+                const videoStatsResponse = await axios.get(
+                    "https://www.googleapis.com/youtube/v3/videos",
+                    {
+                        params: {
+                            key: apiKey,
+                            id: videoIds.join(","),
+                            part: "snippet,statistics,contentDetails",
+                        },
+                    }
+                );
+
+                const videos = videoStatsResponse.data.items.map((item) => {
+                    const duration = convertDurationToSeconds(
+                        item.contentDetails.duration
+                    );
+                    const isShort = duration <= 61;
+                    return {
+                        videoId: item.id,
+                        title: item.snippet.title || "N/A",
+                        description: item.snippet.description || "N/A",
+                        thumbnail: item.snippet.thumbnails.high.url || "N/A",
+                        uploadTime: convertToMySQLDatetime(
+                            item.snippet.publishedAt
+                        ),
+                        views: item.statistics.viewCount || 0,
+                        likes: item.statistics.likeCount || 0,
+                        dislikes: item.statistics.dislikeCount || 0,
+                        link: `https://www.youtube.com/watch?v=${item.id}`,
+                        duration: convertDurationToSeconds(
+                            item.contentDetails.duration
+                        ),
+                        channelId: item.snippet.channelId,
+                        tags: item.snippet.tags
+                            ? item.snippet.tags.join(", ")
+                            : "",
+                        category:
+                            getCategoryName(item.snippet.categoryId) || "N/A",
+                        isShort: isShort,
+                    };
+                });
+
+                const videoPromises = videos.map((video) => {
+                    return connection.execute(
+                        `INSERT INTO videos (video_id, title, views, likes, dislikes, link, upload_time, channel_id, thumbnail_link, video_description, duration, tags, category, isShort)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         ON DUPLICATE KEY UPDATE title = VALUES(title), views = VALUES(views), likes = VALUES(likes), dislikes = VALUES(dislikes), link = VALUES(link), upload_time = VALUES(upload_time), thumbnail_link = VALUES(thumbnail_link), video_description = VALUES(video_description), duration = VALUES(duration), tags = VALUES(tags), category = VALUES(category), isShort =VALUES(isShort)`,
+                        [
+                            video.videoId,
+                            video.title,
+                            video.views,
+                            video.likes,
+                            video.dislikes,
+                            video.link,
+                            video.uploadTime,
+                            video.channelId,
+                            video.thumbnail,
+                            video.description,
+                            video.duration,
+                            video.tags,
+                            video.category,
+                            video.isShort,
+                        ]
+                    );
+                });
+
+                await Promise.all(videoPromises);
+                fetchedResults += videos.length;
+                nextPageToken = searchResponse.data.nextPageToken;
+
+                if (!nextPageToken) {
+                    break;
+                }
+            } catch (searchError) {
+                if (searchError.response) {
+                    console.error(
+                        "Error during search API request:",
+                        searchError.response.data
+                    );
+                } else {
+                    console.error(
+                        "Error during search API request:",
+                        searchError.message
+                    );
+                }
+                console.error("Request params:", {
+                    key: apiKey,
+                    channelId: channelId,
+                    part: "snippet",
+                    order: "date",
+                    maxResults: maxResults,
+                    pageToken: nextPageToken,
+                });
+                break;
+            }
+        }
+
+        await connection.end();
+    } catch (error) {
+        if (error.response) {
+            console.error(
+                "Error fetching and storing videos:",
+                error.response.data
+            );
+        } else {
+            console.error("Error fetching and storing videos:", error.message);
+        }
+        throw error;
+    }
+};
 
 app.listen(port, () => console.log(`Server on port: ${port}`));
