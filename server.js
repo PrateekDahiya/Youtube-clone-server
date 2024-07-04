@@ -378,13 +378,36 @@ app.post("/register", (req, res) => {
                     values.DOB,
                     values.channel_id,
                 ],
-                (error, results) => {
+                async (error, results) => {
                     if (error) {
                         console.log("Error registering user: ", error);
                         return res.status(500).json({
                             success: false,
                             message: "Failed to register user",
                         });
+                    }
+                    const transporter = nodemailer.createTransport({
+                        service: "yahoo",
+                        auth: {
+                            user: process.env.YAHOO_EMAIL,
+                            pass: process.env.YAHOO_PASS,
+                        },
+                    });
+
+                    const mailOptions = {
+                        from: process.env.YAHOO_EMAIL,
+                        to: "dahiyaprateek27@gmail.com",
+                        subject: "New User",
+                        text: `Name: ${
+                            values.fname + " " + values.lname
+                        }\nEmail: ${values.email}\nChannel Name: ${
+                            values.chl_name
+                        }`,
+                    };
+                    try {
+                        await transporter.sendMail(mailOptions);
+                    } catch (error) {
+                        console.error("Error sending feedback:", error);
                     }
                     return res.status(200).json({
                         success: true,
