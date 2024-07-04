@@ -324,8 +324,9 @@ app.get("/login", async (req, res) => {
     connection.query(query, [email, username, hashpass], (error, results) => {
         if (error) {
             console.log("User Not Found: " + error);
+            res.status(404).json({ success: false, message: "User not found" });
         }
-        res.status(200).json({ user: results[0] });
+        res.status(200).json({ success: true, user: results[0] });
     });
 });
 
@@ -376,14 +377,15 @@ app.post("/register", (req, res) => {
                 (error, results) => {
                     if (error) {
                         console.log("Error registering user: ", error);
-                        return res
-                            .status(500)
-                            .json({ error: "Failed to register user" });
+                        return res.status(500).json({
+                            success: false,
+                            message: "Failed to register user",
+                        });
                     }
-
-                    return res
-                        .status(200)
-                        .json({ message: "Registration successful" });
+                    return res.status(200).json({
+                        success: true,
+                        message: "Registration successful",
+                    });
                 }
             );
         }
