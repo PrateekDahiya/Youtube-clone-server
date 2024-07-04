@@ -677,7 +677,7 @@ app.post("/addtosubs", (req, res) => {
 });
 
 let offset = 0;
-const batchSize = 5;
+const batchSize = 10;
 
 app.get("/update_channels", async (req, res) => {
     try {
@@ -705,7 +705,7 @@ function getChannelIds(offset, limit) {
 }
 
 async function processChannels(channelIds) {
-    const totalResults = 5;
+    const totalResults = 10;
     const startingPageToken = null;
 
     const fetchPromises = channelIds.map((channelId) => {
