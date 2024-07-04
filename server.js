@@ -684,8 +684,12 @@ const batchSize = 10;
 app.get("/update_channels", async (req, res) => {
     try {
         const channelIds = await getChannelIds(offset, batchSize);
-        await processChannels(channelIds);
-        offset += batchSize;
+        if (channelIds.length === 0) {
+            offset = 0;
+        } else {
+            await processChannels(channelIds);
+            offset += batchSize;
+        }
         res.status(200).json({ Channels_updated_successfully: channelIds });
     } catch (error) {
         console.error("Error:", error.message);
