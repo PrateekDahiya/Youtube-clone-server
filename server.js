@@ -401,6 +401,216 @@ app.get("/getvideobyid", (req, res) => {
     });
 });
 
+app.post("/updateUserDetail", (req, res) => {
+    const field = req.body.field;
+    const value = req.body.value;
+    const user_id = req.body.user_id;
+    const query = `UPDATE user SET \`${field}\` = ? WHERE user_id = ?`;
+    connection.query(query, [value, user_id], (error, results) => {
+        if (error) {
+            console.log("UpdateUserDetail: " + error);
+        }
+        res.status(200).json({ message: "User details updated" });
+    });
+});
+
+app.post("/updateChannelDetail", (req, res) => {
+    const field = req.body.field;
+    const value = req.body.value;
+    const channel_id = req.body.channel_id;
+    const query = `UPDATE channels SET \`${field}\` = ? WHERE channel_id = ?`;
+    connection.query(query, [value, channel_id], (error, results) => {
+        if (error) {
+            console.log("ChannelUserDetail: " + error);
+        }
+        res.status(200).json({ message: "User details updated" });
+    });
+});
+
+app.post("/getUser", (req, res) => {
+    const user_id = req.body.user_id;
+    const query = `select * from user u join channels c on u.channel_id=c.channel_id where user_id= ?`;
+    connection.query(query, [user_id], (error, results) => {
+        if (error) {
+            console.log("GetUser: " + error);
+        }
+        res.status(200).json({ user: results });
+    });
+});
+
+app.post("/deleteUser", (req, res) => {
+    const channel_id = req.body.channel_id;
+    const user_id = req.body.user_id;
+
+    // Define queries to delete user-related data first
+    const deleteHistoryQuery = "DELETE FROM history WHERE user_id = ?";
+    const deleteWatchLaterQuery = "DELETE FROM watchlater WHERE user_id = ?";
+    const deleteLikedVideosQuery = "DELETE FROM likedvideos WHERE user_id = ?";
+    const deleteSubscriptionsQuery =
+        "DELETE FROM subscriptions WHERE user_id = ?";
+    const deleteCommentsQuery = "DELETE FROM comments WHERE user_id = ?";
+    const deleteUserQuery = "DELETE FROM user WHERE user_id = ?";
+
+    // Start a transaction
+    connection.beginTransaction(function (err) {
+        if (err) {
+            console.log("Error starting transaction: " + err);
+            throw err;
+        }
+
+        // Execute each query in sequence
+        connection.query(
+            deleteHistoryQuery,
+            [user_id],
+            function (err, results) {
+                if (err) {
+                    connection.rollback(function () {
+                        console.log("Error deleting history: " + err);
+                        throw err;
+                    });
+                }
+
+                connection.query(
+                    deleteWatchLaterQuery,
+                    [user_id],
+                    function (err, results) {
+                        if (err) {
+                            connection.rollback(function () {
+                                console.log(
+                                    "Error deleting watch later: " + err
+                                );
+                                throw err;
+                            });
+                        }
+
+                        connection.query(
+                            deleteLikedVideosQuery,
+                            [user_id],
+                            function (err, results) {
+                                if (err) {
+                                    connection.rollback(function () {
+                                        console.log(
+                                            "Error deleting liked videos: " +
+                                                err
+                                        );
+                                        throw err;
+                                    });
+                                }
+
+                                connection.query(
+                                    deleteSubscriptionsQuery,
+                                    [user_id],
+                                    function (err, results) {
+                                        if (err) {
+                                            connection.rollback(function () {
+                                                console.log(
+                                                    "Error deleting subscriptions: " +
+                                                        err
+                                                );
+                                                throw err;
+                                            });
+                                        }
+
+                                        connection.query(
+                                            deleteCommentsQuery,
+                                            [user_id],
+                                            function (err, results) {
+                                                if (err) {
+                                                    connection.rollback(
+                                                        function () {
+                                                            console.log(
+                                                                "Error deleting comments: " +
+                                                                    err
+                                                            );
+                                                            throw err;
+                                                        }
+                                                    );
+                                                }
+
+                                                connection.query(
+                                                    deleteUserQuery,
+                                                    [user_id],
+                                                    function (err, results) {
+                                                        if (err) {
+                                                            connection.rollback(
+                                                                function () {
+                                                                    console.log(
+                                                                        "Error deleting user: " +
+                                                                            err
+                                                                    );
+                                                                    throw err;
+                                                                }
+                                                            );
+                                                        }
+
+                                                        // If user is successfully deleted, proceed to delete the channel
+                                                        const deleteChannelQuery =
+                                                            "DELETE FROM channels WHERE channel_id = ?";
+                                                        connection.query(
+                                                            deleteChannelQuery,
+                                                            [channel_id],
+                                                            function (
+                                                                err,
+                                                                results
+                                                            ) {
+                                                                if (err) {
+                                                                    connection.rollback(
+                                                                        function () {
+                                                                            console.log(
+                                                                                "Error deleting channel: " +
+                                                                                    err
+                                                                            );
+                                                                            throw err;
+                                                                        }
+                                                                    );
+                                                                }
+
+                                                                // Commit the transaction if all queries were successful
+                                                                connection.commit(
+                                                                    function (
+                                                                        err
+                                                                    ) {
+                                                                        if (
+                                                                            err
+                                                                        ) {
+                                                                            connection.rollback(
+                                                                                function () {
+                                                                                    console.log(
+                                                                                        "Error committing transaction: " +
+                                                                                            err
+                                                                                    );
+                                                                                    throw err;
+                                                                                }
+                                                                            );
+                                                                        }
+                                                                        console.log(
+                                                                            "Transaction successfully completed."
+                                                                        );
+                                                                        res.status(
+                                                                            200
+                                                                        ).json({
+                                                                            message:
+                                                                                "User and channel deleted successfully.",
+                                                                        });
+                                                                    }
+                                                                );
+                                                            }
+                                                        );
+                                                    }
+                                                );
+                                            }
+                                        );
+                                    }
+                                );
+                            }
+                        );
+                    }
+                );
+            }
+        );
+    });
+});
+
 app.get("/getvideosofchannel", (req, res) => {
     const channel_id = req.query.channel_id;
     const searchTerm = req.query.query || ""; // default to empty string if query is not provided
@@ -466,17 +676,43 @@ app.post("/addtosubs", (req, res) => {
     });
 });
 
-app.get("/update_channel", (req, res) => {
-    const reqchannelid = req.query.channel_id;
-    const channelId = reqchannelid;
-    const totalResults = 5;
-    const startingPageToken = null;
-    if (channelId.length > 20) {
-        fetchAndStoreVideos(channelId, totalResults, startingPageToken).catch(
-            (error) => console.error("Error:", error.message)
-        );
+let offset = 0;
+const batchSize = 5;
+
+app.get("/update_channels", async (req, res) => {
+    try {
+        const channelIds = await getChannelIds(offset, batchSize);
+        await processChannels(channelIds);
+        offset += batchSize;
+        res.status(200).send("Channels updated successfully.");
+    } catch (error) {
+        console.error("Error:", error.message);
+        res.status(500).send("Error updating channels.");
     }
 });
+
+function getChannelIds(offset, limit) {
+    return new Promise((resolve, reject) => {
+        const query = `SELECT channel_id FROM channels LIMIT ${limit} OFFSET ${offset}`;
+        connection.query(query, (error, results) => {
+            if (error) {
+                return reject(error);
+            }
+            const channelIds = results.map((row) => row.channel_id);
+            resolve(channelIds);
+        });
+    });
+}
+
+async function processChannels(channelIds) {
+    const totalResults = 5;
+    const startingPageToken = null;
+
+    const fetchPromises = channelIds.map((channelId) => {
+        return fetchAndStoreVideos(channelId, totalResults, startingPageToken);
+    });
+    await Promise.all(fetchPromises);
+}
 
 app.post("/removefromsubs", (req, res) => {
     const user_chl_id = req.body.user_chl_id;
@@ -811,30 +1047,6 @@ app.get("/getallchannels", (req, res) => {
             return res.status(500).json({ error: error.message });
         }
         res.status(200).json({ data: results });
-    });
-});
-
-app.get("/getfeed", (req, res) => {
-    const user_id = req.query.user_id;
-    const query = `SELECT feed FROM user where user_id= ?`;
-    connection.query(query, [user_id], (error, results) => {
-        if (error) {
-            return res.status(500).json({ error: error.message });
-        }
-        res.json({ feed: results });
-    });
-});
-
-app.post("/updatefeed", (req, res) => {
-    const user_id = req.body.user_id;
-    const feed = req.body.feed;
-    const query = `UPDATE user SET feed = ? WHERE user_id = ?`;
-
-    connection.query(query, [feed, user_id], (error, results) => {
-        if (error) {
-            return res.status(500).json({ error: error.message });
-        }
-        res.json({ message: "Feed updated successfully" });
     });
 });
 
