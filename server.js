@@ -10,7 +10,7 @@ const axios = require("axios");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
 
-const variablesFilePath = path.join(__dirname, "offset.json");
+const variablesFilePath = path.join(__dirname, "variables.json");
 
 app.use(express.json());
 app.use(cors());
