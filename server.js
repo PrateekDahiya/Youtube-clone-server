@@ -1185,7 +1185,8 @@ const fetchAndStoreVideos = async (
             !channelResponse.data.items ||
             channelResponse.data.items.length === 0
         ) {
-            throw new Error("Channel not found.");
+            console.log(`Channel not found: ${channelId}`);
+            return;
         }
 
         const channel = channelResponse.data.items[0];
@@ -1337,17 +1338,17 @@ const fetchAndStoreVideos = async (
                 }
             } catch (searchError) {
                 if (searchError.response) {
-                    console.error(
+                    console.log(
                         "Error during search API request:",
                         searchError.response.data
                     );
                 } else {
-                    console.error(
+                    console.log(
                         "Error during search API request:",
                         searchError.message
                     );
                 }
-                console.error("Request params:", {
+                console.log("Request params:", {
                     key: apiKey,
                     channelId: channelId,
                     part: "snippet",
@@ -1362,14 +1363,13 @@ const fetchAndStoreVideos = async (
         await connection.end();
     } catch (error) {
         if (error.response) {
-            console.error(
+            console.log(
                 "Error fetching and storing videos:",
                 error.response.data
             );
         } else {
-            console.error("Error fetching and storing videos:", error.message);
+            console.log("Error fetching and storing videos:", error.message);
         }
-        throw error;
     }
 };
 
