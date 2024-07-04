@@ -9,6 +9,8 @@ const axios = require("axios");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
 
+const variablesFilePath = path.join(__dirname, "offset.json");
+
 app.use(express.json());
 app.use(cors());
 var config = {
@@ -31,6 +33,7 @@ connection.connect((err) => {
 
 // Functions
 const { v4: uuidv4 } = require("uuid");
+const { off } = require("process");
 
 function generateBase64Uuid(extraInput) {
     const uuid = uuidv4();
@@ -678,18 +681,41 @@ app.post("/addtosubs", (req, res) => {
     });
 });
 
-let offset = 0;
-const batchSize = 10;
+function readVariables(name) {
+    try {
+        const data = fs.readFileSync(variablesFilePath, "utf8");
+        const json = JSON.parse(data);
+        return json[name];
+    } catch (error) {
+        console.error("Error reading offset file:", error.message);
+        return 0;
+    }
+}
+
+function writeVariables(offset, batchSize, totalResults) {
+    const json = { offset, batchSize, totalResults };
+    fs.writeFileSync(variablesFilePath, JSON.stringify(json), "utf8");
+}
+
+let offset = readVariables("offset");
+let batchSize = readVariables("batchSize");
+let totalResults = readVariables("totalResults");
 
 app.get("/update_channels", async (req, res) => {
     try {
         const channelIds = await getChannelIds(offset, batchSize);
         if (channelIds.length === 0) {
             offset = 0;
+            batchSize++;
+            if (totalResults > 5) {
+                totalResults -= 5;
+            }
         } else {
             await processChannels(channelIds);
             offset += batchSize;
         }
+        writeVariables(offset, batchSize, totalResults);
+
         res.status(200).json({ Channels_updated_successfully: channelIds });
     } catch (error) {
         console.error("Error:", error.message);
@@ -711,7 +737,6 @@ function getChannelIds(offset, limit) {
 }
 
 async function processChannels(channelIds) {
-    const totalResults = 10;
     const startingPageToken = null;
 
     const fetchPromises = channelIds.map((channelId) => {
