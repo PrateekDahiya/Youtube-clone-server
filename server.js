@@ -1,5 +1,4 @@
 const express = require("express");
-const fs = require("fs");
 const path = require("path");
 const app = express();
 const mysql = require("mysql2");
@@ -9,8 +8,6 @@ const port = process.env.PORT;
 const axios = require("axios");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
-
-const variablesFilePath = path.join(__dirname, "variables.json");
 
 app.use(express.json());
 app.use(cors());
@@ -705,40 +702,19 @@ app.post("/addtosubs", (req, res) => {
     });
 });
 
-function readVariables(name) {
-    try {
-        const data = fs.readFileSync(variablesFilePath, "utf8");
-        const json = JSON.parse(data);
-        return json[name];
-    } catch (error) {
-        console.error("Error reading offset file:", error.message);
-        return 0;
-    }
-}
-
-function writeVariables(offset, batchSize, totalResults) {
-    const json = { offset, batchSize, totalResults };
-    fs.writeFileSync(variablesFilePath, JSON.stringify(json), "utf8");
-}
-
-let offset = readVariables("offset");
-let batchSize = readVariables("batchSize");
-let totalResults = readVariables("totalResults");
+let offset = 0;
+let batchSize = 10;
+let totalResults = 5;
 
 app.get("/update_channels", async (req, res) => {
     try {
         const channelIds = await getChannelIds(offset, batchSize);
         if (channelIds.length === 0) {
             offset = 0;
-            batchSize++;
-            if (totalResults > 5) {
-                totalResults -= 5;
-            }
         } else {
             await processChannels(channelIds);
             offset += batchSize;
         }
-        writeVariables(offset, batchSize, totalResults);
 
         res.status(200).json({ Channels_updated_successfully: channelIds });
     } catch (error) {
