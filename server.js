@@ -745,7 +745,7 @@ async function processChannels(channelIds) {
     await Promise.all(fetchPromises);
 }
 
-app.post("/addnewchannel", async (req, res) => {
+app.get("/addnewchannel", async (req, res) => {
     try {
         const channelId = await getNewChannelId();
         await addNewChannel(channelId);
