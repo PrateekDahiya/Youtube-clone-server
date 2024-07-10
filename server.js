@@ -8,6 +8,7 @@ const port = process.env.PORT;
 const axios = require("axios");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
+const API_KEYS = JSON.parse(process.env.API_KEYS);
 
 app.use(express.json());
 app.use(cors());
@@ -780,7 +781,6 @@ const getRandomCategory = () => {
 
 const getNewChannelId = async () => {
     const apiKey = API_KEYS[currentApiKeyIndex];
-    currentApiKeyIndex = (currentApiKeyIndex + 1) % API_KEYS.length;
     const category = getRandomCategory();
     const response = await fetch(
         `https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&regionCode=US&videoCategoryId=${category}&maxResults=1&key=${apiKey}`
@@ -1162,7 +1162,6 @@ app.get("/get-channel-ids", (req, res) => {
         res.json({ channelIds: results });
     });
 });
-const API_KEYS = JSON.parse(process.env.API_KEYS);
 
 let currentApiKeyIndex = 0;
 
