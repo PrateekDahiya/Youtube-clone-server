@@ -703,7 +703,7 @@ app.post("/addtosubs", (req, res) => {
 });
 
 let offset = 0;
-let batchSize = 10;
+let batchSize = 5;
 let totalResults = 5;
 
 app.get("/update_channels", async (req, res) => {
@@ -744,6 +744,66 @@ async function processChannels(channelIds) {
     });
     await Promise.all(fetchPromises);
 }
+
+app.post("/addnewchannel", async (req, res) => {
+    try {
+        const channelId = await getNewChannelId();
+        await addNewChannel(channelId);
+        res.status(200).json({ Channel_added_successfully: channelId });
+    } catch (error) {
+        console.error("Error:", error.message);
+        res.status(500).send("Error adding channel.");
+    }
+});
+
+const categories = [
+    "1", // Film & Animation
+    "2", // Autos & Vehicles
+    "10", // Music
+    "15", // Pets & Animals
+    "17", // Sports
+    "20", // Gaming
+    "22", // People & Blogs
+    "23", // Comedy
+    "24", // Entertainment
+    "25", // News & Politics
+    "26", // Howto & Style
+    "27", // Education
+    "28", // Science & Technology
+    "29", // Nonprofits & Activism
+];
+
+const getRandomCategory = () => {
+    const randomIndex = Math.floor(Math.random() * categories.length);
+    return categories[randomIndex];
+};
+
+const getNewChannelId = async () => {
+    const apiKey = API_KEYS[currentApiKeyIndex];
+    currentApiKeyIndex = (currentApiKeyIndex + 1) % API_KEYS.length;
+    const category = getRandomCategory();
+    const response = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&regionCode=US&videoCategoryId=${category}&maxResults=1&key=${apiKey}`
+    );
+    const data = await response.json();
+
+    if (data.items.length > 0) {
+        return data.items[0].snippet.channelId;
+    } else {
+        console.error("No popular videos found.");
+        return null;
+    }
+};
+
+const addNewChannel = async (channelId) => {
+    const totalResults = 50;
+    const startingPageToken = null;
+    if (channelId.length > 20) {
+        fetchAndStoreVideos(channelId, totalResults, startingPageToken).catch(
+            (error) => console.error("Error:", error.message)
+        );
+    }
+};
 
 app.post("/removefromsubs", (req, res) => {
     const user_chl_id = req.body.user_chl_id;
