@@ -228,7 +228,12 @@ app.get("/category", (req, res) => {
         }
     );
 });
-function createFeedAndGenerateSQL(tags, excludedVideoIds = []) {
+
+function createFeedAndGenerateSQL(
+    tags,
+    excludedVideoIds = [],
+    maxVideosPerChannel = 10
+) {
     const wordCount = {};
 
     tags.forEach((tag) => {
@@ -253,33 +258,43 @@ function createFeedAndGenerateSQL(tags, excludedVideoIds = []) {
     let scoreCalculations = "";
     if (multipleOccurrences.length > 0) {
         scoreCalculations = multipleOccurrences
-            .map((word) => `IF(LOCATE('${word}', tags), 1, 0)`)
+            .map((word) => `IF(LOCATE('${word}', v.tags), 1, 0)`)
             .join(" + ");
     } else {
         scoreCalculations = "0"; // Default score calculation if no words found
     }
+
     let sqlQuery = "";
     if (excludedVideoIds.length === 0) {
         sqlQuery = `
             SELECT 
-                *, (${scoreCalculations}) AS score
-            FROM videos v
+                v.*, c.channel_id AS channel_id_alias, (${scoreCalculations}) AS score
+            FROM (
+                SELECT v.*, ROW_NUMBER() OVER(PARTITION BY v.channel_id ORDER BY v.video_id) as channel_row_number
+                FROM videos v
+                WHERE v.isShort = 0
+            ) as v
             JOIN channels c ON v.channel_id = c.channel_id
-            WHERE v.isShort = 0
+            WHERE v.channel_row_number <= ${maxVideosPerChannel}
             ORDER BY score DESC
         `;
     } else {
         const excludearray = excludedVideoIds.map((id) => `'${id}'`).join(", ");
         sqlQuery = `
-        SELECT 
-            *, (${scoreCalculations}) AS score
-        FROM videos v
-        JOIN channels c ON v.channel_id = c.channel_id
-        WHERE v.video_id NOT IN (${excludearray}) 
-        AND v.isShort = 0
-        ORDER BY score DESC
-    `;
+            SELECT 
+                v.*, c.channel_id AS channel_id_alias, (${scoreCalculations}) AS score
+            FROM (
+                SELECT v.*, ROW_NUMBER() OVER(PARTITION BY v.channel_id ORDER BY v.video_id) as channel_row_number
+                FROM videos v
+                WHERE v.video_id NOT IN (${excludearray}) 
+                AND v.isShort = 0
+            ) as v
+            JOIN channels c ON v.channel_id = c.channel_id
+            WHERE v.channel_row_number <= ${maxVideosPerChannel}
+            ORDER BY score DESC
+        `;
     }
+
     return sqlQuery;
 }
 
