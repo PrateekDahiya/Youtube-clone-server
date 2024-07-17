@@ -749,8 +749,11 @@ async function processChannels(channelIds) {
 app.get("/addnewchannel", async (req, res) => {
     try {
         const channelId = await getNewChannelId();
-        await addNewChannel(channelId);
-        res.status(200).json({ Channel_added_successfully: channelId });
+        const success = await addNewChannel(channelId);
+        res.status(200).json({
+            success: success,
+            Channel_id: channelId,
+        });
     } catch (error) {
         console.error("Error:", error.message);
         res.status(500).send("Error adding channel.");
@@ -800,9 +803,12 @@ const addNewChannel = async (channelId) => {
     const startingPageToken = null;
     if (channelId.length > 20) {
         fetchAndStoreVideos(channelId, totalResults, startingPageToken).catch(
-            (error) => console.error("Error:", error.message)
+            (error) => {
+                return "False";
+            }
         );
     }
+    return "True";
 };
 
 app.post("/removefromsubs", (req, res) => {
