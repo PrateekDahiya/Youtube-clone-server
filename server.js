@@ -228,6 +228,169 @@ app.get("/category", (req, res) => {
         }
     );
 });
+function createFeedAndGenerateSQL(tags, excludedVideoIds = []) {
+    const wordCount = {};
+
+    tags.forEach((tag) => {
+        const words = tag.split(/[\s,]+/);
+        words.forEach((word) => {
+            const cleanedWord = word.toLowerCase().trim(); // Normalize case and trim whitespace
+            if (wordCount[cleanedWord]) {
+                wordCount[cleanedWord]++;
+            } else {
+                wordCount[cleanedWord] = 1;
+            }
+        });
+    });
+
+    const multipleOccurrences = [];
+    for (const [word, count] of Object.entries(wordCount)) {
+        if (count > 1) {
+            multipleOccurrences.push(word);
+        }
+    }
+
+    let scoreCalculations = "";
+    if (multipleOccurrences.length > 0) {
+        scoreCalculations = multipleOccurrences
+            .map((word) => `IF(LOCATE('${word}', tags), 1, 0)`)
+            .join(" + ");
+    } else {
+        scoreCalculations = "0"; // Default score calculation if no words found
+    }
+    let sqlQuery = "";
+    if (excludedVideoIds.length === 0) {
+        sqlQuery = `
+            SELECT 
+                *, (${scoreCalculations}) AS score
+            FROM videos v
+            JOIN channels c ON v.channel_id = c.channel_id
+            WHERE v.isShort = 0
+            ORDER BY score DESC
+        `;
+    } else {
+        const excludearray = excludedVideoIds.map((id) => `'${id}'`).join(", ");
+        sqlQuery = `
+        SELECT 
+            *, (${scoreCalculations}) AS score
+        FROM videos v
+        JOIN channels c ON v.channel_id = c.channel_id
+        WHERE v.video_id NOT IN (${excludearray}) 
+        AND v.isShort = 0
+        ORDER BY score DESC
+    `;
+    }
+    return sqlQuery;
+}
+
+function fetchRelatedVideos(video_id, res) {
+    const fetchTagsQuery = `SELECT tags FROM videos WHERE video_id = ?`;
+    connection.query(fetchTagsQuery, [video_id], (error, results) => {
+        if (error) {
+            console.log(error);
+            res.status(500).json({ error: "Database error" });
+            return;
+        }
+
+        if (results.length === 0) {
+            res.status(404).json({ error: "Video not found" });
+            return;
+        }
+
+        const tags = results[0].tags.split(",").map((tag) => tag.trim());
+
+        // Step 2: Generate SQL query for related videos using fetched tags
+        const sqlQuery = createFeedAndGenerateSQL(tags) + "limit 20";
+        // Step 3: Execute the SQL query to fetch related videos
+        connection.query(sqlQuery, [video_id], (error, relatedVideos) => {
+            if (error) {
+                console.log(error);
+                res.status(500).json({ error: "Database error" });
+                return;
+            }
+
+            // Step 4: Return fetched related videos to the client
+            res.status(200).json({
+                page: "related_videos",
+                videos: relatedVideos,
+            });
+        });
+    });
+}
+
+// Route handler for /related-videos endpoint
+app.get("/related-videos", (req, res) => {
+    const video_id = req.query.video_id; // Assuming video_id is provided as a query parameter
+
+    if (!video_id) {
+        res.status(400).json({ error: "Missing video_id parameter" });
+        return;
+    }
+    fetchRelatedVideos(video_id, res);
+});
+
+async function fetchVideoHistory(user_chl_id) {
+    return new Promise((resolve, reject) => {
+        const query = `
+            SELECT v.tags
+            FROM history h 
+            JOIN videos v ON h.video_id = v.video_id 
+            WHERE h.user_id = ? 
+            ORDER BY h.watched_time DESC 
+            LIMIT 100
+        `;
+
+        connection.query(query, [user_chl_id], (error, results) => {
+            if (error) {
+                console.log("Error fetching video history:", error.message);
+                return reject(error);
+            }
+            resolve(results || []); // Resolve with empty array if no videos found
+        });
+    });
+}
+
+app.get("/personalized-feed", async (req, res) => {
+    const user_chl_id = req.query.user_id;
+    const page_no = req.query.page || 1;
+
+    if (!user_chl_id) {
+        return res.status(400).json({ error: "Missing user_id parameter" });
+    }
+
+    try {
+        const videoHistory = await fetchVideoHistory(user_chl_id);
+
+        const excludedVideoIds = videoHistory.map((video) => video.video_id);
+
+        const tags = videoHistory
+            .map((video) => video.tags)
+            .join(",")
+            .split(",")
+            .map((tag) => tag.trim());
+
+        const sqlQuery =
+            createFeedAndGenerateSQL(tags, excludedVideoIds) +
+            ` LIMIT 24 OFFSET ${24 * (page_no - 1)}`;
+
+        connection.query(sqlQuery, (error, feed) => {
+            if (error) {
+                console.log("Error fetching related videos:", error.message);
+                res.status(500).json({ error: "Database error" });
+                return;
+            }
+
+            // Return personalized feed to the client
+            res.status(200).json({
+                page: "personalized_feed",
+                videos: feed,
+            });
+        });
+    } catch (error) {
+        console.log("Error in fetching data:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
 
 app.get("/trendings", (req, res) => {
     const type = req.query.type;
