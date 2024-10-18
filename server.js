@@ -3,7 +3,6 @@ const path = require("path");
 const app = express();
 const mysql = require("mysql2");
 require("dotenv").config();
-const { exec } = require("child_process");
 const port = process.env.PORT;
 const axios = require("axios");
 const cors = require("cors");
@@ -228,70 +227,84 @@ app.get("/category", (req, res) => {
         }
     );
 });
+function sanitizeTag(tag) {
+    return tag.replace(/'/g, "''"); // Escape single quotes
+}
 
 function createFeedAndGenerateSQL(
     tags,
     excludedVideoIds = [],
-    maxVideosPerChannel = 5
+    maxVideosPerChannel = 5,
+    limit = 24 // Specify the limit of videos to retrieve
 ) {
     const wordCount = {};
 
+    // Split tags into words, sanitize, and count occurrences
     tags.forEach((tag) => {
-        const words = tag.split(/[\s,]+/);
+        const sanitizedTag = sanitizeTag(tag); // Sanitize the entire tag
+        const words = sanitizedTag.split(/[\s,]+/);
         words.forEach((word) => {
             const cleanedWord = word.toLowerCase().trim();
-            if (wordCount[cleanedWord]) {
-                wordCount[cleanedWord]++;
-            } else {
-                wordCount[cleanedWord] = 1;
+            if (cleanedWord) {
+                wordCount[cleanedWord] = (wordCount[cleanedWord] || 0) + 1;
             }
         });
     });
 
-    const multipleOccurrences = [];
-    for (const [word, count] of Object.entries(wordCount)) {
-        if (count > 1) {
-            multipleOccurrences.push(word);
-        }
-    }
+    // Get words with multiple occurrences
+    const multipleOccurrences = Object.entries(wordCount)
+        .filter(([word, count]) => count > 1)
+        .sort((a, b) => b[1] - a[1]) // Sort by count in descending order
+        .slice(0, 50) // Take the first 50 words
+        .map(([word]) => word); // Only extract the word
 
-    let scoreCalculations = "";
-    if (multipleOccurrences.length > 0) {
-        scoreCalculations = multipleOccurrences
-            .map((word) => `IF(LOCATE('${word}', v.tags), 1, 0)`)
-            .join(" + ");
-    } else {
-        scoreCalculations = "0";
-    }
+    // Generate score calculations based on the top 50 words
+    let scoreCalculations =
+        multipleOccurrences.length > 0
+            ? multipleOccurrences
+                  .map(
+                      (word) =>
+                          `IF(LOCATE('${sanitizeTag(word)}', v.tags), 1, 0)`
+                  )
+                  .join(" + ")
+            : "0";
 
+    // Filter out undefined or empty video IDs
+    const filteredExcludedIds = excludedVideoIds
+        .filter((id) => id && id !== "undefined")
+        .map((id) => `'${sanitizeTag(id)}'`); // Sanitize excluded video IDs
+
+    // Generate the SQL query
     let sqlQuery = "";
-    if (excludedVideoIds.length === 0) {
+    if (filteredExcludedIds.length === 0) {
         sqlQuery = `
             SELECT 
                 v.*, c.*, (${scoreCalculations}) AS score
             FROM (
-                SELECT v.*, ROW_NUMBER() OVER(PARTITION BY v.channel_id ORDER BY v.video_id) as channel_row_number
+                SELECT v.*, ROW_NUMBER() OVER(PARTITION BY v.channel_id ORDER BY v.video_id) AS channel_row_number
                 FROM videos v
                 WHERE v.isShort = 0
-            ) as v
+            ) AS v
             JOIN channels c ON v.channel_id = c.channel_id
             WHERE v.channel_row_number <= ${maxVideosPerChannel}
             ORDER BY score DESC
+            LIMIT ${limit}
         `;
     } else {
-        const excludearray = excludedVideoIds.map((id) => `'${id}'`).join(", ");
+        const excludearray = filteredExcludedIds.join(", ");
         sqlQuery = `
             SELECT 
                 v.*, c.*, (${scoreCalculations}) AS score
             FROM (
-                SELECT v.*, ROW_NUMBER() OVER(PARTITION BY v.channel_id ORDER BY v.video_id) as channel_row_number
+                SELECT v.*, ROW_NUMBER() OVER(PARTITION BY v.channel_id ORDER BY v.video_id) AS channel_row_number
                 FROM videos v
                 WHERE v.video_id NOT IN (${excludearray}) 
                 AND v.isShort = 0
-            ) as v
+            ) AS v
             JOIN channels c ON v.channel_id = c.channel_id
             WHERE v.channel_row_number <= ${maxVideosPerChannel}
             ORDER BY score DESC
+            LIMIT ${limit}
         `;
     }
 
@@ -302,7 +315,7 @@ function fetchRelatedVideos(video_id, res) {
     const fetchTagsQuery = `SELECT tags FROM videos WHERE video_id = ?`;
     connection.query(fetchTagsQuery, [video_id], (error, results) => {
         if (error) {
-            console.log(error);
+            console.log(error, fetchTagsQuery);
             res.status(500).json({ error: "Database error" });
             return;
         }
@@ -312,12 +325,25 @@ function fetchRelatedVideos(video_id, res) {
             return;
         }
 
-        const tags = results[0].tags.split(",").map((tag) => tag.trim());
+        // Split and trim the tags, and ensure they are valid
+        const tags = results[0].tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter((tag) => tag); // Remove any empty tags
 
-        const sqlQuery = createFeedAndGenerateSQL(tags) + "limit 20";
-        connection.query(sqlQuery, [video_id], (error, relatedVideos) => {
+        // Check if we have tags
+        if (tags.length === 0) {
+            res.status(400).json({ error: "No tags available for this video" });
+            return;
+        }
+
+        // Generate SQL query
+        const sqlQuery = createFeedAndGenerateSQL(tags) + " LIMIT 20"; // Ensure space before LIMIT
+
+        connection.query(sqlQuery, (error, relatedVideos) => {
             if (error) {
                 console.log(error);
+                console.log("Generated SQL Query:", sqlQuery); // Log for debugging
                 res.status(500).json({ error: "Database error" });
                 return;
             }
@@ -380,11 +406,12 @@ app.get("/personalized-feed", async (req, res) => {
 
         const sqlQuery =
             createFeedAndGenerateSQL(tags, excludedVideoIds) +
-            ` LIMIT 24 OFFSET ${24 * (page_no - 1)}`;
+            `OFFSET ${24 * page_no}`;
 
         connection.query(sqlQuery, (error, feed) => {
             if (error) {
                 console.log("Error fetching related videos:", error.message);
+                console.log("Generated SQL Query:", sqlQuery);
                 res.status(500).json({ error: "Database error" });
                 return;
             }
