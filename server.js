@@ -255,7 +255,6 @@ function createFeedAndGenerateSQL(
     const multipleOccurrences = Object.entries(wordCount)
         .filter(([word, count]) => count > 1)
         .sort((a, b) => b[1] - a[1]) // Sort by count in descending order
-        .slice(0, 50) // Take the first 50 words
         .map(([word]) => word); // Only extract the word
 
     // Generate score calculations based on the top 50 words
