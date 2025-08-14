@@ -20,4 +20,4 @@ EXPOSE 8080
 ENV PORT=8080
 
 # Start the application
-CMD ["npm", "start"]
+CMD npm install && npm start
