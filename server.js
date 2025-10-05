@@ -145,6 +145,10 @@ app.get("/subscriptions", (req, res) => {
     });
 });
 
+app.get('/healthz', (req, res) => {
+  res.send('OK');
+});
+
 app.get("/watch", (req, res) => {
     const videoId = req.query.video_id;
     const query = `select * from videos v join channels c on v.channel_id=c.channel_id where v.video_id= ?`;
@@ -1665,3 +1669,4 @@ const fetchAndStoreVideos = async (
 };
 
 app.listen(port, () => console.log(`Server on port: ${port}`));
+
